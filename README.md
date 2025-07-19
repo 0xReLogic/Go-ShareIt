@@ -12,7 +12,7 @@
 
 ---
 
-Go-ShareIt is a lightweight, local-first file sharing application built entirely with the Go standard library. It is designed for users who need a quick and secure way to transfer a file with a self-destructing link. Once a file is downloaded, it is permanently deleted from the server, ensuring privacy and security.
+Go-ShareIt is a lightweight, local-first file sharing application built entirely with the Go standard library. It is designed for users who need a quick and secure way to transfer a file with a self-destructing link. Run it on one machine and access it from any other device on the same Wi-Fi network or mobile hotspot to transfer files without using internet data. Once a file is downloaded, it is permanently deleted from the server, ensuring privacy and security.
 
 ## Screenshots
 
@@ -24,6 +24,7 @@ Go-ShareIt is a lightweight, local-first file sharing application built entirely
 
 - **Secure One-Time Downloads**: Each generated link is valid for only a single download. 
 - **Self-Destructing Files**: After a successful download, the file is immediately and permanently deleted from the server's storage.
+- **Offline Local Transfers**: Share files across devices on the same Wi-Fi or mobile hotspot network without using internet data.
 - **Zero External Dependencies**: Built using only the Go standard library, making it lightweight and fast.
 - **Cross-Platform**: Comes with a simple build script to generate binaries for Windows, macOS, and Linux.
 - **Self-Contained Executable**: All necessary assets, including the web interface, are embedded directly into the executable file. This means you can run it anywhere without needing extra files.
@@ -74,10 +75,10 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 ---
 
-<a href="https://star-history.com/#0xReLogic/Go-ShareIt&Date">
-  <picture>
-    <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/svg?repos=0xReLogic/Go-ShareIt&type=Date&theme=dark" />
-    <source media="(prefers-color-scheme: light)" srcset="https://api.star-history.com/svg?repos=0xReLogic/Go-ShareIt&type=Date" />
-    <img alt="Star History Chart" src="https://api.star-history.com/svg?repos=0xReLogic/Go-ShareIt&type=Date" />
-  </picture>
-</a>
+## Star History
+
+[![Star History Chart](https://api.star-history.com/svg?repos=0xReLogic/Go-ShareIt&type=Date)](https://www.star-history.com/#0xReLogic/Go-ShareIt&Date)
+
+<div align="center">
+  <i>Made with ❤️ by ReLogic</i>
+</div>
