@@ -3,10 +3,14 @@
   <h1>Go-ShareIt</h1>
   <p>A simple, secure, and self-hosted file sharing application.</p>
   
-  <p>
-    <a href="https://github.com/0xReLogic/Go-ShareIt/releases"><img src="https://img.shields.io/github/v/release/0xReLogic/Go-ShareIt?style=for-the-badge"/></a>
-    <a href="https://github.com/0xReLogic/Go-ShareIt/blob/main/LICENSE"><img src="https://img.shields.io/github/license/0xReLogic/Go-ShareIt?style=for-the-badge"/></a>
-    <a href="https://github.com/0xReLogic/Go-ShareIt/commits/main"><img src="https://img.shields.io/github/last-commit/0xReLogic/Go-ShareIt?style=for-the-badge"/></a>
+    <p>
+    <a href="https://github.com/0xReLogic/Go-ShareIt/releases"><img src="https://img.shields.io/github/release/0xReLogic/Go-ShareIt.svg?style=for-the-badge&logo=github" alt="Release"></a>
+    <a href="https://goreportcard.com/report/github.com/0xReLogic/Go-ShareIt"><img src="https://goreportcard.com/badge/github.com/0xReLogic/Go-ShareIt?style=for-the-badge" alt="Go Report Card"></a>
+    <a href="https://github.com/0xReLogic/Go-ShareIt/blob/main/LICENSE"><img src="https://img.shields.io/github/license/0xReLogic/Go-ShareIt?style=for-the-badge" alt="License"></a>
+    <br>
+    <img src="https://img.shields.io/badge/Go-1.22+-00ADD8?style=for-the-badge&logo=go" alt="Go Version">
+    <img src="https://img.shields.io/badge/Platform-Windows%20%7C%20macOS%20%7C%20Linux-blue?style=for-the-badge&logo=windows" alt="Platform">
+    <img src="https://raw.githubusercontent.com/MartinHeinz/MartinHeinz/master/images/gopher.gif" height="32" alt="Running Gopher">
   </p>
 </div>
 
