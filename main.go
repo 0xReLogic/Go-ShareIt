@@ -111,10 +111,7 @@ func uploadHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	mutex.Lock()
-	fileTokens[token] = fileInfo{
-		Path:      dstPath,
-		CreatedAt: time.Now(),
-	}
+	fileTokens[token] = fileInfo{Path: dstPath, CreatedAt: time.Now()}
 	mutex.Unlock()
 
 	shareableLink := fmt.Sprintf("http://%s/files/%s", r.Host, token)
@@ -128,7 +125,7 @@ func downloadHandler(w http.ResponseWriter, r *http.Request) {
 	info, ok := fileTokens[token]
 
 	// Check if token is valid and not expired
-	if !ok || time.Since(info.CreatedAt) > 5*time.Minute {
+	if !ok || time.Since(info.CreatedAt) > time.Minute*5 {
 		if ok { // If the token exists but is expired, clean up the file
 			delete(fileTokens, token)
 			os.Remove(info.Path)
