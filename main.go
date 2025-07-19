@@ -13,8 +13,6 @@ import (
 	"time"
 )
 
-
-
 // Global variables for state management
 var (
 	fileTokens = make(map[string]fileInfo)
