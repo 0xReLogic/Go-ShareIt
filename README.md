@@ -32,10 +32,18 @@ Go-ShareIt is a lightweight, local-first file sharing application built entirely
 
 ## Usage
 
-1.  Download the latest release for your operating system from the [Releases](https://github.com/0xReLogic/Go-ShareIt/releases) page.
-2.  Run the executable file. A terminal window will open, indicating that the server is running.
-3.  Open your web browser and navigate to `http://localhost:8080`.
-4.  Select a file, upload it, and you will receive a unique, secure download link.
+1.  **Download** the latest release for your operating system from the [Releases](https://github.com/0xReLogic/Go-ShareIt/releases) page.
+2.  **Run** the executable file. A terminal window will open, indicating that the server is running.
+3.  **Allow Firewall Access**: If your operating system's firewall prompts for permission, make sure to **Allow Access**, especially for **Private Networks**. This is crucial for other devices to connect.
+4.  **Start Sharing**:
+    -   **On the same computer**: Open your web browser and navigate to `http://localhost:8080`.
+    -   **From another device (phone/laptop)**:
+        1.  Connect the device to the **same Wi-Fi network or mobile hotspot**.
+        2.  Find the local IP address of the computer running Go-ShareIt:
+            -   **Windows**: Open Command Prompt (`cmd`) and type `ipconfig`. Look for the `IPv4 Address`.
+            -   **macOS/Linux**: Open a terminal and type `ip addr` or `ifconfig`.
+        3.  On your other device's browser, enter `http://<YOUR_LOCAL_IP>:8080` (e.g., `http://192.168.1.10:8080`).
+5.  Select a file, upload it, and you will receive a unique, secure download link.
 
 ## How to Build (For Developers)
 
