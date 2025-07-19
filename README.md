@@ -24,6 +24,9 @@ Go-ShareIt is a lightweight, local-first file sharing application built entirely
 
 - **Secure One-Time Downloads**: Each generated link is valid for only a single download. 
 - **Self-Destructing Files**: After a successful download, the file is immediately and permanently deleted from the server's storage.
+- **Large File Support**: Efficiently handles large files of any size through streaming, ensuring low memory usage.
+- **Stateless & Always Ready**: After each download, the file and token are instantly destroyed. The server is immediately ready for the next share without needing a restart.
+- **Time-Based Expiration**: Links automatically expire after 5 minutes to prevent long-term exposure.
 - **Offline Local Transfers**: Share files across devices on the same Wi-Fi or mobile hotspot network without using internet data.
 - **Zero External Dependencies**: Built using only the Go standard library, making it lightweight and fast.
 - **Cross-Platform**: Comes with a simple build script to generate binaries for Windows, macOS, and Linux.
@@ -90,3 +93,34 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 <div align="center">
   <i>Made with ❤️ by ReLogic</i>
 </div>
+
+## Roadmap
+
+Here is the future development plan for Go-ShareIt, based on priority:
+
+### v1.5 - Security Enhancements (Next Priority)
+- [ ] **End-to-End Encryption**: Implement client-side encryption so the server can never read the file contents.
+- [ ] **Password Protection**: Add an option to protect downloads with a password.
+- [ ] **Custom Expiration Settings**: Allow users to set their own expiration time limits.
+- [ ] **Token Encryption**: Encrypt the token within the URL to prevent manipulation.
+
+### v2.0 - Optimization & Advanced Features
+- [ ] **Multi-File Upload**: Allow users to upload multiple files or an entire folder in a single session.
+- [ ] **Automatic Compression**: Automatically compress files before upload to speed up transfers.
+- [ ] **CLI Version**: Build a command-line interface (CLI) for power users, aligning with the project's original vision.
+
+---
+
+## How to Contribute
+
+We welcome contributions from everyone to make Go-ShareIt better! If you're interested in helping, here are the areas where we need the most help:
+
+1.  **Implement Roadmap Features**: You can pick up any item from the **v1.5 Roadmap** or **v2.0** above. Features like **password protection** or **token encryption** would be incredibly valuable additions.
+
+2.  **Concurrency Improvements**: We currently use a standard `mutex` for access control. We'd like to implement more sophisticated solutions to handle many concurrent connections:
+    -   **For Uploads**: Use a *Worker Pool Pattern* to limit the number of simultaneous uploads.
+    -   **For Downloads**: Use a *Channel as a Semaphore* to ensure only one download is active per token.
+
+3.  **Refactoring & Testing**: Help write unit and integration tests to ensure code stability and reliability as new features are added.
+
+Please open a new issue to discuss your ideas or claim an existing one before you start working. Thank you for helping!
