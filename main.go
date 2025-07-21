@@ -23,6 +23,7 @@ var (
 type fileInfo struct {
 	Path      string
 	CreatedAt time.Time
+	mu        sync.RWMutex
 }
 
 func main() {
@@ -124,12 +125,21 @@ func downloadHandler(w http.ResponseWriter, r *http.Request) {
 	mutex.Lock()
 	info, ok := fileTokens[token]
 
-	// Check if token is valid and not expired
-	if !ok || time.Since(info.CreatedAt) > time.Minute*5 {
-		if ok { // If the token exists but is expired, clean up the file
-			delete(fileTokens, token)
-			os.Remove(info.Path)
-		}
+	// Check if token is valid
+	if !ok {
+		mutex.Unlock()
+		http.Error(w, "Link is invalid or has expired.", http.StatusNotFound)
+		return
+	}
+
+	// Lock the file-specific mutex to prevent other downloads of the same file
+	info.mu.Lock()
+	defer info.mu.Unlock()
+
+	// Check if the file has expired
+	if time.Since(info.CreatedAt) > time.Minute*5 {
+		delete(fileTokens, token)
+		os.Remove(info.Path)
 		mutex.Unlock()
 		http.Error(w, "Link is invalid or has expired.", http.StatusNotFound)
 		return
