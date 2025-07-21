@@ -139,8 +139,8 @@ func downloadHandler(w http.ResponseWriter, r *http.Request) {
 	// Check if the file has expired
 	if time.Since(info.CreatedAt) > time.Minute*5 {
 		delete(fileTokens, token)
-		mutex.Unlock()
 		os.Remove(info.Path)
+		mutex.Unlock()
 		http.Error(w, "Link is invalid or has expired.", http.StatusNotFound)
 		return
 	}
