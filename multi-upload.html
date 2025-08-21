@@ -1,0 +1,484 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Multi-File Upload - Share-it</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/water.css@2/out/dark.css">
+    <style>
+        body {
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #202b38;
+            color: #dbdbdb;
+        }
+        .container {
+            background-color: #161f27;
+            color: #dbdbdb;
+            padding: 2rem;
+            border-radius: 8px;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.3);
+        }
+        .file-list {
+            margin: 20px 0;
+            border: 1px solid #2c3e50;
+            border-radius: 4px;
+            padding: 10px;
+            max-height: 300px;
+            overflow-y: auto;
+            background-color: #0d1117;
+        }
+        .file-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 8px;
+            border-bottom: 1px solid #2c3e50;
+        }
+        .file-item:last-child {
+            border-bottom: none;
+        }
+        .file-name {
+            flex-grow: 1;
+            margin-right: 10px;
+            word-break: break-all;
+            color: #dbdbdb;
+        }
+        .file-size {
+            color: #a9b1ba;
+            font-size: 0.9em;
+            min-width: 80px;
+            text-align: right;
+        }
+        .remove-btn {
+            background-color: #e74c3c;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            padding: 4px 8px;
+            margin-left: 10px;
+            cursor: pointer;
+        }
+        .progress-container {
+            margin-top: 20px;
+        }
+        .progress-bar {
+            height: 20px;
+            background-color: #f3f3f3;
+            border-radius: 4px;
+            margin-bottom: 10px;
+            overflow: hidden;
+        }
+        .progress {
+            height: 100%;
+            background-color: #4caf50;
+            width: 0%;
+            transition: width 0.3s ease;
+        }
+        .upload-options {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 20px;
+            margin: 20px 0;
+        }
+        .option-group {
+            flex: 1;
+            min-width: 200px;
+        }
+        .results {
+            margin-top: 20px;
+            display: none;
+        }
+        .result-item {
+            background-color: #f8f9fa;
+            border-radius: 4px;
+            padding: 10px;
+            margin-bottom: 10px;
+        }
+        .result-item h4 {
+            margin-top: 0;
+            margin-bottom: 5px;
+        }
+        .copy-btn {
+            background-color: #3498db;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            padding: 4px 8px;
+            cursor: pointer;
+        }
+        .error {
+            color: #e74c3c;
+        }
+        .success {
+            color: #2ecc71;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Multi-File Upload</h1>
+        <p>Upload multiple files at once and get shareable links for each one.</p>
+        <p><a href="/">Back to standard upload</a> | <a href="/e2e">Need maximum privacy? Try our end-to-end encrypted uploader!</a></p>
+        
+        <div>
+            <label for="file-input">Select Files:</label>
+            <input type="file" id="file-input" multiple>
+            <button id="add-files-btn">Add Files</button>
+        </div>
+        
+        <div class="file-list" id="file-list">
+            <div class="empty-message">No files selected. Add files to begin.</div>
+        </div>
+        
+        <div class="upload-options">
+            <div class="option-group">
+                <label for="expiration">Expiration Time:</label>
+                <select id="expiration">
+                    <option value="5">5 minutes</option>
+                    <option value="15">15 minutes</option>
+                    <option value="60">1 hour</option>
+                    <option value="1440">24 hours</option>
+                </select>
+            </div>
+            
+            <div class="option-group">
+                <label for="password">Password Protection (optional):</label>
+                <input type="password" id="password" placeholder="Leave empty for no password">
+            </div>
+            
+            <div class="option-group">
+                <label for="compress">File Compression:</label>
+                <select id="compress">
+                    <option value="true">Automatic (recommended)</option>
+                    <option value="false">Disabled</option>
+                </select>
+                <small>Automatically compresses compatible files to reduce transfer size.</small>
+            </div>
+        </div>
+        
+        <button id="upload-btn" disabled>Upload Files</button>
+        
+        <div class="progress-container" id="progress-container" style="display: none;">
+            <h3>Uploading Files... <span id="progress-text">0%</span></h3>
+            <div class="progress-bar">
+                <div class="progress" id="progress-bar"></div>
+            </div>
+            <p id="current-file">Preparing upload...</p>
+        </div>
+        
+        <div class="results" id="results">
+            <h2>Upload Results</h2>
+            <div id="result-list"></div>
+            <button id="copy-all-btn">Copy All Links</button>
+            <button id="upload-more-btn">Upload More Files</button>
+        </div>
+    </div>
+    
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            const fileInput = document.getElementById('file-input');
+            const addFilesBtn = document.getElementById('add-files-btn');
+            const fileList = document.getElementById('file-list');
+            const uploadBtn = document.getElementById('upload-btn');
+            const progressContainer = document.getElementById('progress-container');
+            const progressBar = document.getElementById('progress-bar');
+            const progressText = document.getElementById('progress-text');
+            const currentFile = document.getElementById('current-file');
+            const results = document.getElementById('results');
+            const resultList = document.getElementById('result-list');
+            const copyAllBtn = document.getElementById('copy-all-btn');
+            const uploadMoreBtn = document.getElementById('upload-more-btn');
+            const expirationSelect = document.getElementById('expiration');
+            const passwordInput = document.getElementById('password');
+            
+            let files = [];
+            
+            // Add files button click handler
+            addFilesBtn.addEventListener('click', function() {
+                fileInput.click();
+            });
+            
+            // File input change handler
+            fileInput.addEventListener('change', function() {
+                if (fileInput.files.length > 0) {
+                    // Add new files to the array
+                    for (let i = 0; i < fileInput.files.length; i++) {
+                        const file = fileInput.files[i];
+                        // Check if file already exists in the array
+                        const exists = files.some(f => f.name === file.name && f.size === file.size);
+                        if (!exists) {
+                            files.push(file);
+                        }
+                    }
+                    
+                    // Update the file list
+                    updateFileList();
+                    
+                    // Reset the file input
+                    fileInput.value = '';
+                }
+            });
+            
+            // Update the file list UI
+            function updateFileList() {
+                fileList.innerHTML = '';
+                
+                if (files.length === 0) {
+                    fileList.innerHTML = '<div class="empty-message">No files selected. Add files to begin.</div>';
+                    uploadBtn.disabled = true;
+                    return;
+                }
+                
+                uploadBtn.disabled = false;
+                
+                files.forEach((file, index) => {
+                    const fileItem = document.createElement('div');
+                    fileItem.className = 'file-item';
+                    
+                    const fileName = document.createElement('div');
+                    fileName.className = 'file-name';
+                    fileName.textContent = file.name;
+                    
+                    const fileSize = document.createElement('div');
+                    fileSize.className = 'file-size';
+                    fileSize.textContent = formatFileSize(file.size);
+                    
+                    const removeBtn = document.createElement('button');
+                    removeBtn.className = 'remove-btn';
+                    removeBtn.textContent = 'Remove';
+                    removeBtn.addEventListener('click', function() {
+                        files.splice(index, 1);
+                        updateFileList();
+                    });
+                    
+                    fileItem.appendChild(fileName);
+                    fileItem.appendChild(fileSize);
+                    fileItem.appendChild(removeBtn);
+                    fileList.appendChild(fileItem);
+                });
+            }
+            
+            // Format file size
+            function formatFileSize(bytes) {
+                if (bytes === 0) return '0 B';
+                
+                const k = 1024;
+                const sizes = ['B', 'KB', 'MB', 'GB', 'TB'];
+                const i = Math.floor(Math.log(bytes) / Math.log(k));
+                
+                return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+            }
+            
+            // Upload button click handler
+            uploadBtn.addEventListener('click', function() {
+                if (files.length === 0) return;
+                
+                // Show progress container
+                progressContainer.style.display = 'block';
+                
+                // Hide file list and options
+                fileList.style.display = 'none';
+                document.querySelector('.upload-options').style.display = 'none';
+                uploadBtn.style.display = 'none';
+                
+                // Get options
+                const expiration = expirationSelect.value;
+                const password = passwordInput.value;
+                const compress = document.getElementById('compress').value;
+                
+                // Upload files one by one
+                uploadFiles(expiration, password, compress);
+            });
+            
+            // Upload files function
+            async function uploadFiles(expiration, password, compress) {
+                const results = [];
+                let totalProgress = 0;
+                
+                for (let i = 0; i < files.length; i++) {
+                    const file = files[i];
+                    currentFile.textContent = `Uploading ${i+1}/${files.length}: ${file.name}`;
+                    
+                    try {
+                        const result = await uploadFile(file, expiration, password, compress);
+                        results.push({
+                            file: file.name,
+                            success: true,
+                            url: result.url,
+                            expiresIn: result.expiresIn,
+                            isProtected: result.isProtected,
+                            isCompressed: result.isCompressed,
+                            size: result.size,
+                            originalSize: result.originalSize
+                        });
+                    } catch (error) {
+                        results.push({
+                            file: file.name,
+                            success: false,
+                            error: error.message || 'Upload failed'
+                        });
+                    }
+                    
+                    // Update progress
+                    totalProgress = ((i + 1) / files.length) * 100;
+                    progressBar.style.width = totalProgress + '%';
+                    progressText.textContent = Math.round(totalProgress) + '%';
+                }
+                
+                // Show results
+                showResults(results);
+            }
+            
+            // Upload a single file
+            function uploadFile(file, expiration, password, compress) {
+                return new Promise((resolve, reject) => {
+                    const formData = new FormData();
+                    formData.append('file', file);
+                    formData.append('expiration', expiration);
+                    if (password) {
+                        formData.append('password', password);
+                    }
+                    formData.append('compress', compress);
+                    
+                    const xhr = new XMLHttpRequest();
+                    
+                    xhr.open('POST', '/upload', true);
+                    
+                    xhr.onload = function() {
+                        if (xhr.status === 200) {
+                            try {
+                                const response = JSON.parse(xhr.responseText);
+                                if (response.success) {
+                                    resolve(response);
+                                } else {
+                                    reject(new Error(response.message || 'Upload failed'));
+                                }
+                            } catch (e) {
+                                reject(new Error('Invalid response from server'));
+                            }
+                        } else {
+                            try {
+                                const response = JSON.parse(xhr.responseText);
+                                reject(new Error(response.message || 'Upload failed'));
+                            } catch (e) {
+                                reject(new Error(`Server error: ${xhr.status}`));
+                            }
+                        }
+                    };
+                    
+                    xhr.onerror = function() {
+                        reject(new Error('Network error'));
+                    };
+                    
+                    xhr.send(formData);
+                });
+            }
+            
+            // Show results
+            function showResults(results) {
+                // Hide progress container
+                progressContainer.style.display = 'none';
+                
+                // Show results container
+                document.getElementById('results').style.display = 'block';
+                
+                // Clear previous results
+                resultList.innerHTML = '';
+                
+                // Add results
+                results.forEach(result => {
+                    const resultItem = document.createElement('div');
+                    resultItem.className = 'result-item';
+                    
+                    if (result.success) {
+                        // Format file sizes
+                        const size = formatFileSize(result.size);
+                        let compressionInfo = '';
+                        
+                        if (result.isCompressed) {
+                            const originalSize = formatFileSize(result.originalSize);
+                            const savingPercent = Math.round((1 - (result.size / result.originalSize)) * 100);
+                            compressionInfo = `<p>Compressed: Yes (saved ${savingPercent}%, from ${originalSize} to ${size})</p>`;
+                        } else {
+                            compressionInfo = `<p>Size: ${size}</p>`;
+                        }
+                        
+                        resultItem.innerHTML = `
+                            <h4 class="success">${result.file}</h4>
+                            <p>Link: <a href="${result.url}" target="_blank">${result.url}</a></p>
+                            <p>Expires in: ${result.expiresIn} minutes</p>
+                            <p>Password protected: ${result.isProtected ? 'Yes' : 'No'}</p>
+                            ${compressionInfo}
+                            <button class="copy-btn" data-url="${result.url}">Copy Link</button>
+                        `;
+                    } else {
+                        resultItem.innerHTML = `
+                            <h4 class="error">${result.file}</h4>
+                            <p>Error: ${result.error}</p>
+                        `;
+                    }
+                    
+                    resultList.appendChild(resultItem);
+                });
+                
+                // Add event listeners to copy buttons
+                document.querySelectorAll('.copy-btn').forEach(btn => {
+                    btn.addEventListener('click', function() {
+                        const url = this.getAttribute('data-url');
+                        navigator.clipboard.writeText(url)
+                            .then(() => {
+                                const originalText = this.textContent;
+                                this.textContent = 'Copied!';
+                                setTimeout(() => {
+                                    this.textContent = originalText;
+                                }, 2000);
+                            })
+                            .catch(err => {
+                                console.error('Failed to copy: ', err);
+                            });
+                    });
+                });
+                
+                // Copy all links button
+                copyAllBtn.addEventListener('click', function() {
+                    const links = results
+                        .filter(result => result.success)
+                        .map(result => result.url)
+                        .join('\n');
+                    
+                    if (links) {
+                        navigator.clipboard.writeText(links)
+                            .then(() => {
+                                const originalText = this.textContent;
+                                this.textContent = 'Copied!';
+                                setTimeout(() => {
+                                    this.textContent = originalText;
+                                }, 2000);
+                            })
+                            .catch(err => {
+                                console.error('Failed to copy: ', err);
+                            });
+                    }
+                });
+                
+                // Upload more button
+                uploadMoreBtn.addEventListener('click', function() {
+                    // Reset everything
+                    files = [];
+                    updateFileList();
+                    
+                    // Show file list and options
+                    fileList.style.display = 'block';
+                    document.querySelector('.upload-options').style.display = 'flex';
+                    uploadBtn.style.display = 'block';
+                    
+                    // Hide results
+                    document.getElementById('results').style.display = 'none';
+                });
+            }
+        });
+    </script>
+</body>
+</html>

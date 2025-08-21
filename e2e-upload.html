@@ -1,0 +1,412 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>End-to-End Encrypted Upload - Share-it</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/water.css@2/out/dark.css">
+    <style>
+        body {
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #202b38;
+            color: #dbdbdb;
+        }
+        .container {
+            background-color: #161f27;
+            color: #dbdbdb;
+            padding: 2rem;
+            border-radius: 8px;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.3);
+            margin-bottom: 20px;
+        }
+        .progress-container {
+            width: 100%;
+            height: 20px;
+            background-color: #f0f0f0;
+            border-radius: 4px;
+            margin-top: 10px;
+            display: none;
+        }
+        .progress-bar {
+            height: 100%;
+            background-color: #4CAF50;
+            border-radius: 4px;
+            width: 0%;
+            transition: width 0.3s;
+        }
+        .options-container {
+            margin-top: 20px;
+            text-align: left;
+        }
+        .hidden {
+            display: none;
+        }
+        .file-info {
+            margin-top: 10px;
+            font-size: 0.9em;
+            color: #a9b1ba;
+        }
+        .security-info {
+            background-color: #0d1117;
+            border-left: 4px solid #4CAF50;
+            padding: 10px 15px;
+            margin: 20px 0;
+            color: #dbdbdb;
+        }
+        .security-info h3 {
+            margin-top: 0;
+            color: #6fcf97;
+        }
+        .key-display {
+            font-family: monospace;
+            background-color: #1a2634;
+            color: #dbdbdb;
+            padding: 8px;
+            border-radius: 4px;
+            word-break: break-all;
+        }
+        .warning {
+            color: #D32F2F;
+            font-weight: bold;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>End-to-End Encrypted Upload</h1>
+        <p>Upload files with client-side encryption for maximum privacy. The server never sees the unencrypted content of your files.</p>
+        
+        <div class="security-info">
+            <h3>How It Works</h3>
+            <p>Your file is encrypted in your browser before being uploaded. The encryption key never leaves your device.</p>
+            <p>When you share the link, the recipient needs both the link and the decryption key to access the file.</p>
+            <p class="warning">Important: If you lose the decryption key, your file cannot be recovered!</p>
+        </div>
+        
+        <p><a href="/">Switch to standard upload</a></p>
+        
+        <form id="uploadForm" enctype="multipart/form-data">
+            <div>
+                <label for="file">Select a file to encrypt and upload:</label>
+                <input type="file" name="file" id="file" required>
+                <div class="file-info" id="fileInfo"></div>
+            </div>
+            
+            <div class="options-container">
+                <div>
+                    <label for="expiration">Link expires after:</label>
+                    <select name="expiration" id="expiration">
+                        <option value="5">5 minutes (default)</option>
+                        <option value="15">15 minutes</option>
+                        <option value="60">1 hour</option>
+                        <option value="1440">24 hours</option>
+                    </select>
+                </div>
+                
+                <div>
+                    <label>
+                        <input type="checkbox" id="compressFile" checked> 
+                        Compress file before encryption (when possible)
+                    </label>
+                </div>
+                
+                <div>
+                    <label for="keyStrength">Encryption strength:</label>
+                    <select name="keyStrength" id="keyStrength">
+                        <option value="128">128-bit (faster)</option>
+                        <option value="256" selected>256-bit (stronger)</option>
+                    </select>
+                </div>
+            </div>
+            
+            <button type="submit" id="uploadButton">Encrypt & Upload File</button>
+            
+            <div class="progress-container" id="progressContainer">
+                <div class="progress-bar" id="progressBar"></div>
+            </div>
+        </form>
+    </div>
+    
+    <div id="resultContainer" class="container hidden">
+        <h2>File Encrypted & Uploaded Successfully!</h2>
+        
+        <div class="security-info">
+            <h3>Decryption Key</h3>
+            <p>This key is required to decrypt the file. It was generated in your browser and is not stored on the server.</p>
+            <div class="key-display" id="decryptionKey"></div>
+            <button id="copyKeyBtn">Copy Key</button>
+        </div>
+        
+        <p>Shareable link: <a href="" id="shareLink"></a></p>
+        <p id="expirationInfo">This link will expire in 5 minutes and is valid for one download only.</p>
+        
+        <div>
+            <h3>How to share securely:</h3>
+            <p>1. Send the link through one channel (e.g., email)</p>
+            <p>2. Send the decryption key through a different channel (e.g., messaging app)</p>
+            <p>3. The recipient will need both to access the file</p>
+        </div>
+        
+        <button id="copyLinkBtn">Copy Link</button>
+        <button id="uploadAnotherBtn">Encrypt & Upload Another File</button>
+    </div>
+    
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            const uploadForm = document.getElementById('uploadForm');
+            const fileInput = document.getElementById('file');
+            const fileInfo = document.getElementById('fileInfo');
+            const progressContainer = document.getElementById('progressContainer');
+            const progressBar = document.getElementById('progressBar');
+            const resultContainer = document.getElementById('resultContainer');
+            const shareLink = document.getElementById('shareLink');
+            const decryptionKey = document.getElementById('decryptionKey');
+            const expirationInfo = document.getElementById('expirationInfo');
+            const copyLinkBtn = document.getElementById('copyLinkBtn');
+            const copyKeyBtn = document.getElementById('copyKeyBtn');
+            const uploadAnotherBtn = document.getElementById('uploadAnotherBtn');
+            
+            // Show file info when a file is selected
+            fileInput.addEventListener('change', function() {
+                if (this.files.length > 0) {
+                    const file = this.files[0];
+                    const fileSize = formatFileSize(file.size);
+                    fileInfo.textContent = `${file.name} (${fileSize})`;
+                } else {
+                    fileInfo.textContent = '';
+                }
+            });
+            
+            // Handle form submission
+            uploadForm.addEventListener('submit', async function(e) {
+                e.preventDefault();
+                
+                const file = fileInput.files[0];
+                if (!file) {
+                    alert('Please select a file to upload');
+                    return;
+                }
+                
+                // Show progress bar
+                progressContainer.style.display = 'block';
+                progressBar.style.width = '0%';
+                
+                try {
+                    // Generate a random encryption key
+                    const keyStrength = document.getElementById('keyStrength').value;
+                    const encryptionKey = await generateEncryptionKey(keyStrength);
+                    
+                    // Read and encrypt the file
+                    progressBar.style.width = '10%';
+                    const { encryptedFile, iv } = await encryptFile(file, encryptionKey);
+                    progressBar.style.width = '50%';
+                    
+                    // Create the decryption key (combination of key and IV)
+                    const decryptKeyString = await exportKeyAndIV(encryptionKey, iv);
+                    
+                    // Upload the encrypted file
+                    const uploadResult = await uploadEncryptedFile(
+                        encryptedFile, 
+                        file.name, 
+                        document.getElementById('expiration').value,
+                        document.getElementById('compressFile').checked
+                    );
+                    
+                    // Display the result
+                    shareLink.href = uploadResult.url;
+                    shareLink.textContent = uploadResult.url;
+                    
+                    // Set the decryption key
+                    decryptionKey.textContent = decryptKeyString;
+                    
+                    // Update expiration info
+                    const expMinutes = document.getElementById('expiration').value;
+                    let expText = `This link will expire in ${expMinutes} minutes`;
+                    if (expMinutes == 60) expText = 'This link will expire in 1 hour';
+                    if (expMinutes == 1440) expText = 'This link will expire in 24 hours';
+                    expirationInfo.textContent = expText + ' and is valid for one download only.';
+                    
+                    // Show result container, hide form
+                    resultContainer.classList.remove('hidden');
+                    uploadForm.parentElement.classList.add('hidden');
+                    
+                } catch (error) {
+                    console.error('Error:', error);
+                    alert('Upload failed: ' + error.message);
+                    progressContainer.style.display = 'none';
+                }
+            });
+            
+            // Generate a random encryption key
+            async function generateEncryptionKey(strength) {
+                const keyLength = parseInt(strength) / 8; // Convert bits to bytes
+                
+                // Generate a random key
+                const key = await window.crypto.subtle.generateKey(
+                    {
+                        name: "AES-GCM",
+                        length: parseInt(strength)
+                    },
+                    true,
+                    ["encrypt", "decrypt"]
+                );
+                
+                return key;
+            }
+            
+            // Export the key and IV as a base64 string
+            async function exportKeyAndIV(key, iv) {
+                const exportedKey = await window.crypto.subtle.exportKey("raw", key);
+                
+                // Combine the key and IV
+                const combined = new Uint8Array(exportedKey.byteLength + iv.byteLength);
+                combined.set(new Uint8Array(exportedKey), 0);
+                combined.set(new Uint8Array(iv), exportedKey.byteLength);
+                
+                // Convert to base64
+                return btoa(String.fromCharCode.apply(null, combined));
+            }
+            
+            // Encrypt the file
+            async function encryptFile(file, key) {
+                // Generate a random IV
+                const iv = window.crypto.getRandomValues(new Uint8Array(12));
+                
+                // Read the file
+                const fileBuffer = await readFileAsArrayBuffer(file);
+                
+                // Encrypt the file
+                const encryptedBuffer = await window.crypto.subtle.encrypt(
+                    {
+                        name: "AES-GCM",
+                        iv: iv
+                    },
+                    key,
+                    fileBuffer
+                );
+                
+                // Create a new file with the encrypted data
+                const encryptedFile = new File(
+                    [encryptedBuffer], 
+                    file.name + ".encrypted", 
+                    { type: "application/octet-stream" }
+                );
+                
+                return { encryptedFile, iv };
+            }
+            
+            // Read a file as ArrayBuffer
+            function readFileAsArrayBuffer(file) {
+                return new Promise((resolve, reject) => {
+                    const reader = new FileReader();
+                    reader.onload = () => resolve(reader.result);
+                    reader.onerror = () => reject(new Error("Failed to read file"));
+                    reader.readAsArrayBuffer(file);
+                });
+            }
+            
+            // Upload the encrypted file
+            async function uploadEncryptedFile(file, originalName, expiration, compress) {
+                const formData = new FormData();
+                formData.append('file', file);
+                formData.append('originalName', originalName);
+                formData.append('expiration', expiration);
+                formData.append('compress', compress);
+                formData.append('encrypted', 'true');
+                
+                return new Promise((resolve, reject) => {
+                    const xhr = new XMLHttpRequest();
+                    xhr.open('POST', '/upload', true);
+                    
+                    // Track upload progress
+                    xhr.upload.onprogress = function(e) {
+                        if (e.lengthComputable) {
+                            const percentComplete = 50 + (e.loaded / e.total) * 50; // Start from 50% (after encryption)
+                            progressBar.style.width = percentComplete + '%';
+                        }
+                    };
+                    
+                    xhr.onload = function() {
+                        if (xhr.status === 200) {
+                            try {
+                                const response = JSON.parse(xhr.responseText);
+                                if (response.success) {
+                                    resolve(response);
+                                } else {
+                                    reject(new Error(response.message || "Upload failed"));
+                                }
+                            } catch (e) {
+                                reject(new Error("Invalid response from server"));
+                            }
+                        } else {
+                            reject(new Error(`Server error: ${xhr.status}`));
+                        }
+                    };
+                    
+                    xhr.onerror = function() {
+                        reject(new Error("Network error"));
+                    };
+                    
+                    xhr.send(formData);
+                });
+            }
+            
+            // Copy link button
+            copyLinkBtn.addEventListener('click', function() {
+                navigator.clipboard.writeText(shareLink.href)
+                    .then(() => {
+                        const originalText = this.textContent;
+                        this.textContent = 'Copied!';
+                        setTimeout(() => {
+                            this.textContent = originalText;
+                        }, 2000);
+                    })
+                    .catch(err => {
+                        console.error('Failed to copy: ', err);
+                    });
+            });
+            
+            // Copy key button
+            copyKeyBtn.addEventListener('click', function() {
+                navigator.clipboard.writeText(decryptionKey.textContent)
+                    .then(() => {
+                        const originalText = this.textContent;
+                        this.textContent = 'Copied!';
+                        setTimeout(() => {
+                            this.textContent = originalText;
+                        }, 2000);
+                    })
+                    .catch(err => {
+                        console.error('Failed to copy: ', err);
+                    });
+            });
+            
+            // Upload another button
+            uploadAnotherBtn.addEventListener('click', function() {
+                // Reset form
+                uploadForm.reset();
+                fileInfo.textContent = '';
+                progressBar.style.width = '0%';
+                progressContainer.style.display = 'none';
+                
+                // Show form, hide result
+                resultContainer.classList.add('hidden');
+                uploadForm.parentElement.classList.remove('hidden');
+            });
+            
+            // Helper function to format file size
+            function formatFileSize(bytes) {
+                if (bytes === 0) return '0 Bytes';
+                
+                const k = 1024;
+                const sizes = ['Bytes', 'KB', 'MB', 'GB', 'TB'];
+                const i = Math.floor(Math.log(bytes) / Math.log(k));
+                
+                return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+            }
+        });
+    </script>
+</body>
+</html>

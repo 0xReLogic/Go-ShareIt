@@ -1,0 +1,312 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Share-it Admin Dashboard</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/water.css@2/out/dark.css">
+    <style>
+        body {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #202b38;
+            color: #dbdbdb;
+        }
+        .container {
+            background-color: #161f27;
+            color: #dbdbdb;
+            padding: 2rem;
+            border-radius: 8px;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.3);
+            margin-bottom: 20px;
+        }
+        .stats {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 20px;
+        }
+        .stat-card {
+            background-color: #0d1117;
+            border-radius: 8px;
+            padding: 15px;
+            width: 30%;
+            text-align: center;
+            color: #dbdbdb;
+        }
+        .stat-value {
+            font-size: 24px;
+            font-weight: bold;
+            margin: 10px 0;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+        th, td {
+            padding: 10px;
+            text-align: left;
+            border-bottom: 1px solid #2c3e50;
+            color: #dbdbdb;
+        }
+        th {
+            background-color: #0d1117;
+            color: #dbdbdb;
+        }
+        .file-actions {
+            display: flex;
+            gap: 10px;
+        }
+        .file-actions button {
+            padding: 5px 10px;
+            font-size: 14px;
+        }
+        .delete-btn {
+            background-color: #e74c3c;
+            color: white;
+        }
+        .refresh-btn {
+            margin-bottom: 20px;
+        }
+        .empty-state {
+            text-align: center;
+            padding: 40px;
+            color: #a9b1ba;
+        }
+        .password-protected {
+            color: #e74c3c;
+            font-weight: bold;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Share-it Admin Dashboard</h1>
+        <p>Monitor and manage all active file shares on your server.</p>
+        
+        <div class="stats">
+            <div class="stat-card">
+                <h3>Active Files</h3>
+                <div class="stat-value" id="activeFiles">0</div>
+            </div>
+            <div class="stat-card">
+                <h3>Total Size</h3>
+                <div class="stat-value" id="totalSize">0 B</div>
+            </div>
+            <div class="stat-card">
+                <h3>Server Time</h3>
+                <div class="stat-value" id="serverTime">-</div>
+            </div>
+        </div>
+        
+        <button class="refresh-btn" id="refreshBtn">Refresh Data</button>
+        
+        <h2>Active File Shares</h2>
+        <div id="fileTableContainer">
+            <table id="fileTable">
+                <thead>
+                    <tr>
+                        <th>Filename</th>
+                        <th>Size</th>
+                        <th>Created</th>
+                        <th>Expires</th>
+                        <th>Protection</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody id="fileTableBody">
+                    <!-- Files will be populated here -->
+                </tbody>
+            </table>
+            <div id="emptyState" class="empty-state">
+                <p>No active file shares found.</p>
+            </div>
+        </div>
+    </div>
+    
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            const refreshBtn = document.getElementById('refreshBtn');
+            const fileTableBody = document.getElementById('fileTableBody');
+            const emptyState = document.getElementById('emptyState');
+            
+            // Load data on page load
+            loadData();
+            
+            // Refresh button click handler
+            refreshBtn.addEventListener('click', loadData);
+            
+            // Function to load data from the API
+            function loadData() {
+                // Show loading state
+                refreshBtn.textContent = 'Loading...';
+                refreshBtn.disabled = true;
+                
+                // Fetch stats and files data
+                Promise.all([
+                    fetch('/api/stats'),
+                    fetch('/api/files')
+                ])
+                .then(responses => {
+                    if (!responses[0].ok || !responses[1].ok) {
+                        throw new Error('Failed to fetch data');
+                    }
+                    return Promise.all(responses.map(res => res.json()));
+                })
+                .then(([stats, files]) => {
+                    // Update stats
+                    document.getElementById('activeFiles').textContent = stats.activeFiles;
+                    document.getElementById('totalSize').textContent = formatFileSize(stats.totalSizeBytes);
+                    document.getElementById('serverTime').textContent = formatDate(stats.serverTime, true);
+                    
+                    // Update files table
+                    updateFilesTable(files);
+                })
+                .catch(error => {
+                    console.error('Error fetching data:', error);
+                    alert('Failed to load data. Please try again.');
+                })
+                .finally(() => {
+                    // Reset button state
+                    refreshBtn.textContent = 'Refresh Data';
+                    refreshBtn.disabled = false;
+                });
+            }
+            
+            // Function to update the files table
+            function updateFilesTable(files) {
+                // Clear existing rows
+                fileTableBody.innerHTML = '';
+                
+                if (files.length === 0) {
+                    // Show empty state
+                    emptyState.style.display = 'block';
+                    return;
+                }
+                
+                // Hide empty state
+                emptyState.style.display = 'none';
+                
+                // Add rows for each file
+                files.forEach(file => {
+                    const row = document.createElement('tr');
+                    
+                    // Filename
+                    const filenameCell = document.createElement('td');
+                    filenameCell.textContent = file.originalName;
+                    row.appendChild(filenameCell);
+                    
+                    // Size
+                    const sizeCell = document.createElement('td');
+                    sizeCell.textContent = formatFileSize(file.size);
+                    row.appendChild(sizeCell);
+                    
+                    // Created
+                    const createdCell = document.createElement('td');
+                    createdCell.textContent = formatDate(file.createdAt);
+                    row.appendChild(createdCell);
+                    
+                    // Expires
+                    const expiresCell = document.createElement('td');
+                    expiresCell.textContent = formatDate(file.expiresAt);
+                    row.appendChild(expiresCell);
+                    
+                    // Protection
+                    const protectionCell = document.createElement('td');
+                    if (file.isProtected) {
+                        protectionCell.textContent = 'Password Protected';
+                        protectionCell.classList.add('password-protected');
+                    } else {
+                        protectionCell.textContent = 'None';
+                    }
+                    row.appendChild(protectionCell);
+                    
+                    // Actions
+                    const actionsCell = document.createElement('td');
+                    const actionsDiv = document.createElement('div');
+                    actionsDiv.className = 'file-actions';
+                    
+                    // Copy link button
+                    const copyBtn = document.createElement('button');
+                    copyBtn.textContent = 'Copy Link';
+                    copyBtn.addEventListener('click', () => {
+                        navigator.clipboard.writeText(file.url)
+                            .then(() => {
+                                copyBtn.textContent = 'Copied!';
+                                setTimeout(() => {
+                                    copyBtn.textContent = 'Copy Link';
+                                }, 2000);
+                            })
+                            .catch(err => {
+                                console.error('Failed to copy: ', err);
+                            });
+                    });
+                    actionsDiv.appendChild(copyBtn);
+                    
+                    // Delete button
+                    const deleteBtn = document.createElement('button');
+                    deleteBtn.textContent = 'Delete';
+                    deleteBtn.className = 'delete-btn';
+                    deleteBtn.addEventListener('click', () => {
+                        if (confirm(`Are you sure you want to delete ${file.originalName}?`)) {
+                            deleteFile(file.token);
+                        }
+                    });
+                    actionsDiv.appendChild(deleteBtn);
+                    
+                    actionsCell.appendChild(actionsDiv);
+                    row.appendChild(actionsCell);
+                    
+                    fileTableBody.appendChild(row);
+                });
+            }
+            
+            // Function to delete a file
+            function deleteFile(token) {
+                fetch(`/api/files/${token}`, {
+                    method: 'DELETE'
+                })
+                .then(response => {
+                    if (!response.ok) {
+                        throw new Error('Failed to delete file');
+                    }
+                    return response.json();
+                })
+                .then(data => {
+                    if (data.success) {
+                        loadData(); // Refresh the data
+                    } else {
+                        alert('Failed to delete file: ' + data.message);
+                    }
+                })
+                .catch(error => {
+                    console.error('Error deleting file:', error);
+                    alert('Failed to delete file. Please try again.');
+                });
+            }
+            
+            // Helper function to format file size
+            function formatFileSize(bytes) {
+                if (bytes === 0) return '0 B';
+                
+                const k = 1024;
+                const sizes = ['B', 'KB', 'MB', 'GB', 'TB'];
+                const i = Math.floor(Math.log(bytes) / Math.log(k));
+                
+                return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+            }
+            
+            // Helper function to format date
+            function formatDate(dateString, timeOnly = false) {
+                const date = new Date(dateString);
+                
+                if (timeOnly) {
+                    return date.toLocaleTimeString();
+                }
+                
+                return date.toLocaleString();
+            }
+        });
+    </script>
+</body>
+</html>

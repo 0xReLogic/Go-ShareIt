@@ -3,46 +3,279 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Share-it</title>
+    <title>Share-it - Secure File Sharing</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/water.css@2/out/dark.css">
     <style>
         body {
-            font-family: sans-serif;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            height: 100vh;
-            margin: 0;
-            background-color: #f0f2f5;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #202b38;
+            color: #dbdbdb;
         }
         .container {
-            background-color: white;
+            background-color: #161f27;
+            color: #dbdbdb;
             padding: 2rem;
             border-radius: 8px;
-            box-shadow: 0 4px 8px rgba(0,0,0,0.1);
-            text-align: center;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.3);
+            margin-bottom: 20px;
         }
-        input[type="file"] {
-            margin-top: 1rem;
-        }
-        input[type="submit"] {
-            margin-top: 1rem;
-            padding: 0.5rem 1rem;
-            border: none;
-            background-color: #007bff;
-            color: white;
+        .progress-container {
+            width: 100%;
+            height: 20px;
+            background-color: #f0f0f0;
             border-radius: 4px;
-            cursor: pointer;
+            margin-top: 10px;
+            display: none;
+        }
+        .progress-bar {
+            height: 100%;
+            background-color: #4CAF50;
+            border-radius: 4px;
+            width: 0%;
+            transition: width 0.3s;
+        }
+        .options-container {
+            margin-top: 20px;
+            text-align: left;
+        }
+        .hidden {
+            display: none;
+        }
+        .file-info {
+            margin-top: 10px;
+            font-size: 0.9em;
+            color: #a9b1ba;
         }
     </style>
 </head>
 <body>
     <div class="container">
-        <h1>Upload a File</h1>
-        <form action="/upload" method="post" enctype="multipart/form-data">
-            <input type="file" name="file" id="file">
-            <br>
-            <input type="submit" value="Upload">
+        <h1>Share-it - Secure File Sharing</h1>
+        <p>Upload files and share them securely with customizable expiration times and password protection.</p>
+        <p><a href="/multi">Need to upload multiple files? Try our multi-file uploader!</a></p>
+        <p><a href="/e2e">Need maximum privacy? Try our end-to-end encrypted uploader!</a></p>
+        
+        <form id="uploadForm" enctype="multipart/form-data">
+            <div>
+                <label for="file">Select a file to upload:</label>
+                <input type="file" name="file" id="file" required>
+                <div class="file-info" id="fileInfo"></div>
+            </div>
+            
+            <div class="options-container">
+                <div>
+                    <label for="expiration">Link expires after:</label>
+                    <select name="expiration" id="expiration">
+                        <option value="5">5 minutes (default)</option>
+                        <option value="15">15 minutes</option>
+                        <option value="60">1 hour</option>
+                        <option value="1440">24 hours</option>
+                    </select>
+                </div>
+                
+                <div>
+                    <label>
+                        <input type="checkbox" id="passwordProtect"> 
+                        Password protect this file
+                    </label>
+                </div>
+                
+                <div id="passwordField" class="hidden">
+                    <label for="password">Password:</label>
+                    <input type="password" name="password" id="password">
+                </div>
+                
+                <div>
+                    <label>
+                        <input type="checkbox" id="compressFile" checked> 
+                        Automatically compress file (when possible)
+                    </label>
+                </div>
+            </div>
+            
+            <button type="submit" id="uploadButton">Upload File</button>
+            
+            <div class="progress-container" id="progressContainer">
+                <div class="progress-bar" id="progressBar"></div>
+            </div>
         </form>
     </div>
+    
+    <div id="resultContainer" class="container hidden">
+        <h2>File Uploaded Successfully!</h2>
+        <p>Shareable link: <a href="" id="shareLink"></a></p>
+        <p id="expirationInfo">This link will expire in 5 minutes and is valid for one download only.</p>
+        <div id="passwordInfo" class="hidden">
+            <p>Password: <span id="displayPassword"></span></p>
+        </div>
+        <button id="copyLinkBtn">Copy Link</button>
+        <button id="uploadAnotherBtn">Upload Another File</button>
+        <p><a href="/multi">Need to upload multiple files? Try our multi-file uploader!</a></p>
+    </div>
+    
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            const uploadForm = document.getElementById('uploadForm');
+            const fileInput = document.getElementById('file');
+            const fileInfo = document.getElementById('fileInfo');
+            const progressContainer = document.getElementById('progressContainer');
+            const progressBar = document.getElementById('progressBar');
+            const resultContainer = document.getElementById('resultContainer');
+            const shareLink = document.getElementById('shareLink');
+            const expirationInfo = document.getElementById('expirationInfo');
+            const passwordProtectCheckbox = document.getElementById('passwordProtect');
+            const passwordField = document.getElementById('passwordField');
+            const passwordInput = document.getElementById('password');
+            const passwordInfo = document.getElementById('passwordInfo');
+            const displayPassword = document.getElementById('displayPassword');
+            const copyLinkBtn = document.getElementById('copyLinkBtn');
+            const uploadAnotherBtn = document.getElementById('uploadAnotherBtn');
+            
+            // Show file info when a file is selected
+            fileInput.addEventListener('change', function() {
+                if (this.files.length > 0) {
+                    const file = this.files[0];
+                    const fileSize = formatFileSize(file.size);
+                    fileInfo.textContent = `${file.name} (${fileSize})`;
+                } else {
+                    fileInfo.textContent = '';
+                }
+            });
+            
+            // Toggle password field visibility
+            passwordProtectCheckbox.addEventListener('change', function() {
+                passwordField.classList.toggle('hidden', !this.checked);
+                if (this.checked) {
+                    passwordInput.setAttribute('required', 'required');
+                } else {
+                    passwordInput.removeAttribute('required');
+                }
+            });
+            
+            // Handle form submission
+            uploadForm.addEventListener('submit', function(e) {
+                e.preventDefault();
+                
+                const file = fileInput.files[0];
+                if (!file) {
+                    alert('Please select a file to upload');
+                    return;
+                }
+                
+                const formData = new FormData();
+                formData.append('file', file);
+                formData.append('expiration', document.getElementById('expiration').value);
+                
+                if (passwordProtectCheckbox.checked && passwordInput.value) {
+                    formData.append('password', passwordInput.value);
+                }
+                
+                // Add compression preference
+                const compressCheckbox = document.getElementById('compressFile');
+                formData.append('compress', compressCheckbox.checked);
+                
+                // Show progress bar
+                progressContainer.style.display = 'block';
+                
+                const xhr = new XMLHttpRequest();
+                xhr.open('POST', '/upload', true);
+                
+                // Track upload progress
+                xhr.upload.onprogress = function(e) {
+                    if (e.lengthComputable) {
+                        const percentComplete = (e.loaded / e.total) * 100;
+                        progressBar.style.width = percentComplete + '%';
+                    }
+                };
+                
+                xhr.onload = function() {
+                    if (xhr.status === 200) {
+                        try {
+                            const response = JSON.parse(xhr.responseText);
+                            
+                            // Update the result container
+                            shareLink.href = response.url;
+                            shareLink.textContent = response.url;
+                            
+                            // Update expiration info
+                            const expMinutes = document.getElementById('expiration').value;
+                            let expText = `This link will expire in ${expMinutes} minutes`;
+                            if (expMinutes == 60) expText = 'This link will expire in 1 hour';
+                            if (expMinutes == 1440) expText = 'This link will expire in 24 hours';
+                            expirationInfo.textContent = expText + ' and is valid for one download only.';
+                            
+                            // Show password if set
+                            if (passwordProtectCheckbox.checked && passwordInput.value) {
+                                passwordInfo.classList.remove('hidden');
+                                displayPassword.textContent = passwordInput.value;
+                            } else {
+                                passwordInfo.classList.add('hidden');
+                            }
+                            
+                            // Show result container, hide form
+                            resultContainer.classList.remove('hidden');
+                            uploadForm.parentElement.classList.add('hidden');
+                            
+                        } catch (e) {
+                            // Fallback for non-JSON responses
+                            resultContainer.innerHTML = xhr.responseText;
+                            resultContainer.classList.remove('hidden');
+                            uploadForm.parentElement.classList.add('hidden');
+                        }
+                    } else {
+                        alert('Upload failed: ' + xhr.statusText);
+                    }
+                };
+                
+                xhr.onerror = function() {
+                    alert('Upload failed. Please try again.');
+                };
+                
+                xhr.send(formData);
+            });
+            
+            // Copy link button
+            copyLinkBtn.addEventListener('click', function() {
+                navigator.clipboard.writeText(shareLink.href)
+                    .then(() => {
+                        const originalText = this.textContent;
+                        this.textContent = 'Copied!';
+                        setTimeout(() => {
+                            this.textContent = originalText;
+                        }, 2000);
+                    })
+                    .catch(err => {
+                        console.error('Failed to copy: ', err);
+                    });
+            });
+            
+            // Upload another button
+            uploadAnotherBtn.addEventListener('click', function() {
+                // Reset form
+                uploadForm.reset();
+                fileInfo.textContent = '';
+                progressBar.style.width = '0%';
+                progressContainer.style.display = 'none';
+                passwordField.classList.add('hidden');
+                
+                // Show form, hide result
+                resultContainer.classList.add('hidden');
+                uploadForm.parentElement.classList.remove('hidden');
+            });
+            
+            // Helper function to format file size
+            function formatFileSize(bytes) {
+                if (bytes === 0) return '0 Bytes';
+                
+                const k = 1024;
+                const sizes = ['Bytes', 'KB', 'MB', 'GB', 'TB'];
+                const i = Math.floor(Math.log(bytes) / Math.log(k));
+                
+                return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+            }
+        });
+    </script>
 </body>
 </html>
