@@ -1,0 +1,7 @@
+# Override GitHub language detection
+*.html linguist-vendored
+*.css linguist-vendored
+*.js linguist-vendored
+
+# Mark Go as the primary language
+*.go linguist-language=Go
