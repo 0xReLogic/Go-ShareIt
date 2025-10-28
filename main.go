@@ -213,8 +213,8 @@ func uploadHandler(w http.ResponseWriter, r *http.Request) {
 	// Handle compression if needed
 	finalPath, finalSize, isCompressed := handleFileCompression(dstPath, header.Filename, size, params.doCompress)
 
-	log.Printf("Uploaded File: %s (saved as %s), Size: %d bytes, Compressed: %v\n",
-		header.Filename, filepath.Base(finalPath), finalSize, isCompressed)
+	log.Printf("File uploaded successfully (saved as %s), Size: %d bytes, Compressed: %v\n",
+		filepath.Base(finalPath), finalSize, isCompressed)
 
 	// Generate shareable link
 	shareableLink, token, err := generateShareableLink(r.Host)
@@ -265,7 +265,7 @@ func parseUploadRequest(r *http.Request) (multipart.File, *multipart.FileHeader,
 	}
 
 	if header.Size > MaxFileSize {
-		log.Printf("File too large: %s (%d bytes)", header.Filename, header.Size)
+		log.Printf("File too large: %d bytes", header.Size)
 		return nil, nil, fmt.Errorf("file too large. Maximum size is %d MB", MaxFileSize/(1024*1024))
 	}
 
@@ -343,7 +343,7 @@ func handleFileCompression(dstPath, filename string, size int64, doCompress bool
 		return dstPath, size, false
 	}
 
-	log.Printf("Compressing file: %s", filename)
+	log.Println("Compressing file...")
 
 	compressedPath, err := compressFile(dstPath, filename)
 	if err != nil {
@@ -587,7 +587,7 @@ func downloadHandler(w http.ResponseWriter, r *http.Request) {
 	// Serve the file
 	serveFile(w, r, filePath, originalName, encryptedToken)
 
-	log.Printf("Download of %s complete. The file has been deleted.", originalName)
+	log.Println("File download complete. The file has been deleted.")
 }
 
 // validateAndGetFileInfo validates the token and handles password protection
