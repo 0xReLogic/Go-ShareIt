@@ -13,7 +13,6 @@ type Config struct {
 		Host string `json:"host"`
 	} `json:"server"`
 	Files struct {
-		MaxSizeMB                int      `json:"maxSizeMB"`
 		DefaultExpirationMinutes int      `json:"defaultExpirationMinutes"`
 		AllowedExtensions        []string `json:"allowedExtensions"`
 	} `json:"files"`
@@ -26,11 +25,10 @@ type Config struct {
 // Global configuration variables
 var (
 	config            Config
-	MaxFileSize       int64 = 1024 * 1024 * 100 // 100 MB
-	DefaultExpiration       = 5                 // 5 minutes
-	AdminUsername           = "admin"           // Default admin username
-	AdminPassword           = "admin123"        // Default admin password
-	allowedExtensions       = []string{
+	DefaultExpiration = 5        // 5 minutes
+	AdminUsername     = "admin"  // Default admin username
+	AdminPassword     = "admin123" // Default admin password
+	allowedExtensions = []string{
 		".jpg", ".jpeg", ".png", ".gif", ".pdf", ".doc", ".docx",
 		".xls", ".xlsx", ".ppt", ".pptx", ".txt", ".zip", ".rar",
 		".7z", ".mp3", ".mp4", ".avi", ".mov", encryptedExt,
@@ -59,7 +57,6 @@ func loadConfig() {
 	}
 
 	// Update global variables with config values
-	MaxFileSize = int64(config.Files.MaxSizeMB) * 1024 * 1024
 	DefaultExpiration = config.Files.DefaultExpirationMinutes
 	AdminUsername = config.Admin.Username
 	AdminPassword = config.Admin.Password
@@ -93,7 +90,6 @@ func loadEncryptionKey() {
 func setDefaultConfig() {
 	config.Server.Port = 8081
 	config.Server.Host = defaultHost
-	config.Files.MaxSizeMB = 100
 	config.Files.DefaultExpirationMinutes = 5
 	config.Files.AllowedExtensions = allowedExtensions
 	config.Admin.Username = AdminUsername
