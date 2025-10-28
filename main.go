@@ -40,6 +40,17 @@ type Config struct {
 	} `json:"admin"`
 }
 
+// Constants for repeated string literals
+const (
+	encryptedExt       = ".encrypted"
+	defaultHost        = "0.0.0.0"
+	methodNotAllowed   = "Method not allowed"
+	contentTypeHeader  = "Content-Type"
+	contentTypeJSON    = "application/json"
+	contentTypeHTML    = "text/html; charset=utf-8"
+	contentTypeOctet   = "application/octet-stream"
+)
+
 // Global variables for state management
 var (
 	config     Config
@@ -54,7 +65,7 @@ var (
 	allowedExtensions       = []string{
 		".jpg", ".jpeg", ".png", ".gif", ".pdf", ".doc", ".docx",
 		".xls", ".xlsx", ".ppt", ".pptx", ".txt", ".zip", ".rar",
-		".7z", ".mp3", ".mp4", ".avi", ".mov", ".encrypted",
+		".7z", ".mp3", ".mp4", ".avi", ".mov", encryptedExt,
 	}
 
 	// Encryption key for token security (32 bytes for AES-256)
@@ -150,10 +161,10 @@ func main() {
 	addr := fmt.Sprintf("%s:%d", config.Server.Host, config.Server.Port)
 
 	log.Printf("Server starting on http://%s:%d",
-		strings.Replace(config.Server.Host, "0.0.0.0", "localhost", 1),
+		strings.Replace(config.Server.Host, defaultHost, "localhost", 1),
 		config.Server.Port)
 	log.Printf("Admin dashboard available at http://%s:%d/admin",
-		strings.Replace(config.Server.Host, "0.0.0.0", "localhost", 1),
+		strings.Replace(config.Server.Host, defaultHost, "localhost", 1),
 		config.Server.Port)
 	if err := http.ListenAndServe(addr, nil); err != nil {
 		log.Fatal(err)
@@ -177,214 +188,271 @@ func basicAuth(handler http.HandlerFunc, username, password string) http.Handler
 
 func uploadHandler(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
-		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		http.Error(w, methodNotAllowed, http.StatusMethodNotAllowed)
 		return
 	}
 
-	// Limit the request body size to prevent DoS attacks
-	r.Body = http.MaxBytesReader(w, r.Body, MaxFileSize+1024) // Add a little extra for form fields
-
-	// Parse the multipart form with a reasonable max memory
-	if err := r.ParseMultipartForm(32 << 20); err != nil {
-		log.Println("Error parsing multipart form:", err)
-		sendErrorResponse(w, "Error processing file upload. The file may be too large.", http.StatusBadRequest)
-		return
-	}
-
-	// Get the file from the form
-	file, header, err := r.FormFile("file")
+	// Parse and validate the upload request
+	file, header, err := parseUploadRequest(r)
 	if err != nil {
-		log.Println("Error getting file from form:", err)
-		sendErrorResponse(w, "No file uploaded or error reading file", http.StatusBadRequest)
+		sendErrorResponse(w, err.Error(), http.StatusBadRequest)
 		return
 	}
 	defer file.Close()
 
-	// Check file size
-	if header.Size > MaxFileSize {
-		log.Printf("File too large: %s (%d bytes)", header.Filename, header.Size)
-		sendErrorResponse(w, fmt.Sprintf("File too large. Maximum size is %d MB", MaxFileSize/(1024*1024)), http.StatusBadRequest)
+	// Get upload parameters
+	params := extractUploadParams(r)
+
+	// Save the uploaded file
+	dstPath, size, err := saveUploadedFile(file, header)
+	if err != nil {
+		sendErrorResponse(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 
-	// Validate file extension if restrictions are in place
+	// Handle compression if needed
+	finalPath, finalSize, isCompressed := handleFileCompression(dstPath, header.Filename, size, params.doCompress)
+
+	log.Printf("Uploaded File: %s (saved as %s), Size: %d bytes, Compressed: %v\n",
+		header.Filename, filepath.Base(finalPath), finalSize, isCompressed)
+
+	// Generate shareable link
+	shareableLink, token, err := generateShareableLink(r.Host)
+	if err != nil {
+		sendErrorResponse(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	// Store file information
+	originalFilename := getOriginalFilename(header.Filename, params.isEncrypted, r.FormValue("originalName"))
+	storeFileInfo(fileStorageInfo{
+		token:        token,
+		path:         finalPath,
+		originalName: originalFilename,
+		params:       params,
+		size:         finalSize,
+		originalSize: size,
+		isCompressed: isCompressed,
+		url:          shareableLink,
+	})
+
+	// Send response
+	sendUploadResponse(w, shareableLink, params, originalFilename, finalSize, size, isCompressed)
+}
+
+// uploadParams holds parameters extracted from the upload request
+type uploadParams struct {
+	expirationMinutes int
+	passwordHash      string
+	isProtected       bool
+	doCompress        bool
+	isEncrypted       bool
+}
+
+// parseUploadRequest parses and validates the multipart form upload
+func parseUploadRequest(r *http.Request) (multipart.File, *multipart.FileHeader, error) {
+	r.Body = http.MaxBytesReader(nil, r.Body, MaxFileSize+1024)
+
+	if err := r.ParseMultipartForm(32 << 20); err != nil {
+		log.Println("Error parsing multipart form:", err)
+		return nil, nil, errors.New("error processing file upload. The file may be too large")
+	}
+
+	file, header, err := r.FormFile("file")
+	if err != nil {
+		log.Println("Error getting file from form:", err)
+		return nil, nil, errors.New("no file uploaded or error reading file")
+	}
+
+	if header.Size > MaxFileSize {
+		log.Printf("File too large: %s (%d bytes)", header.Filename, header.Size)
+		return nil, nil, fmt.Errorf("file too large. Maximum size is %d MB", MaxFileSize/(1024*1024))
+	}
+
 	if len(allowedExtensions) > 0 {
 		fileExt := strings.ToLower(filepath.Ext(header.Filename))
 		if !isAllowedExtension(fileExt) {
 			log.Printf("Invalid file type: %s", fileExt)
-			sendErrorResponse(w, "File type not allowed", http.StatusBadRequest)
-			return
+			return nil, nil, errors.New("file type not allowed")
 		}
 	}
 
-	// Get expiration time from form (default to 5 minutes)
-	expirationMinutes := DefaultExpiration
+	return file, header, nil
+}
+
+// extractUploadParams extracts upload parameters from the request
+func extractUploadParams(r *http.Request) uploadParams {
+	params := uploadParams{
+		expirationMinutes: DefaultExpiration,
+		doCompress:        true,
+	}
+
 	if expStr := r.FormValue("expiration"); expStr != "" {
 		if exp, err := strconv.Atoi(expStr); err == nil && exp > 0 {
-			expirationMinutes = exp
+			params.expirationMinutes = exp
 		}
 	}
 
-	// Check if password protection is enabled
-	password := r.FormValue("password")
-	var passwordHash string
-	isProtected := false
-	if password != "" {
-		// Create a simple hash of the password
+	if password := r.FormValue("password"); password != "" {
 		hash := sha256.Sum256([]byte(password))
-		passwordHash = hex.EncodeToString(hash[:])
-		isProtected = true
+		params.passwordHash = hex.EncodeToString(hash[:])
+		params.isProtected = true
 	}
 
-	// Create a unique filename to avoid collisions
+	if compressStr := r.FormValue("compress"); compressStr == "false" {
+		params.doCompress = false
+	}
+
+	if encryptedParam := r.FormValue("encrypted"); encryptedParam == "true" {
+		params.isEncrypted = true
+	}
+
+	return params
+}
+
+// saveUploadedFile saves the uploaded file to disk
+func saveUploadedFile(file multipart.File, header *multipart.FileHeader) (string, int64, error) {
 	uniqueID, err := generateToken()
 	if err != nil {
-		sendErrorResponse(w, "Failed to generate unique ID", http.StatusInternalServerError)
-		return
+		return "", 0, errors.New("failed to generate unique ID")
 	}
 
-	// Extract file extension and create a unique filename
 	fileExt := filepath.Ext(header.Filename)
 	uniqueFilename := uniqueID + fileExt
 	dstPath := filepath.Join("uploads", uniqueFilename)
 
-	// Create the destination file
 	dst, err := os.Create(dstPath)
 	if err != nil {
 		log.Println("Error creating destination file:", err)
-		sendErrorResponse(w, "Could not save file", http.StatusInternalServerError)
-		return
+		return "", 0, errors.New("could not save file")
 	}
 	defer dst.Close()
 
-	// Stream the file content directly to the disk
 	size, err := io.Copy(dst, file)
 	if err != nil {
 		log.Println("Error saving file content:", err)
-		sendErrorResponse(w, "Error saving file", http.StatusInternalServerError)
-		return
+		return "", 0, errors.New("error saving file")
 	}
 
-	// Close the file to ensure all data is written
-	dst.Close()
+	return dstPath, size, nil
+}
 
-	// Check if we should compress this file
-	isCompressed := false
-	originalSize := size
-
-	// Get compression preference from form
-	doCompress := true
-	if compressStr := r.FormValue("compress"); compressStr == "false" {
-		doCompress = false
+// handleFileCompression compresses the file if needed
+func handleFileCompression(dstPath, filename string, size int64, doCompress bool) (string, int64, bool) {
+	if !doCompress || !shouldCompressFile(filename) {
+		return dstPath, size, false
 	}
 
-	if doCompress && shouldCompressFile(header.Filename) {
-		log.Printf("Compressing file: %s", header.Filename)
+	log.Printf("Compressing file: %s", filename)
 
-		// Compress the file
-		compressedPath, err := compressFile(dstPath, header.Filename)
-		if err != nil {
-			log.Printf("Error compressing file: %v", err)
-			// Continue with the original file if compression fails
-		} else {
-			// Get the size of the compressed file
-			compressedInfo, err := os.Stat(compressedPath)
-			if err != nil {
-				log.Printf("Error getting compressed file info: %v", err)
-			} else if compressedInfo.Size() < size {
-				// Use the compressed file only if it's smaller
-				os.Remove(dstPath) // Remove the original file
-				dstPath = compressedPath
-				size = compressedInfo.Size()
-				isCompressed = true
-				log.Printf("File compressed successfully. Original: %d bytes, Compressed: %d bytes (%.1f%%)",
-					originalSize, size, float64(size)/float64(originalSize)*100)
-			} else {
-				// Compressed file is not smaller, remove it and use the original
-				os.Remove(compressedPath)
-				log.Printf("Compression did not reduce file size. Using original file.")
-			}
-		}
+	compressedPath, err := compressFile(dstPath, filename)
+	if err != nil {
+		log.Printf("Error compressing file: %v", err)
+		return dstPath, size, false
 	}
 
-	log.Printf("Uploaded File: %s (saved as %s), Size: %d bytes, Compressed: %v\n",
-		header.Filename, filepath.Base(dstPath), size, isCompressed)
+	compressedInfo, err := os.Stat(compressedPath)
+	if err != nil {
+		log.Printf("Error getting compressed file info: %v", err)
+		os.Remove(compressedPath)
+		return dstPath, size, false
+	}
 
-	// Generate a token for the download link
+	if compressedInfo.Size() < size {
+		os.Remove(dstPath)
+		log.Printf("File compressed successfully. Original: %d bytes, Compressed: %d bytes (%.1f%%)",
+			size, compressedInfo.Size(), float64(compressedInfo.Size())/float64(size)*100)
+		return compressedPath, compressedInfo.Size(), true
+	}
+
+	os.Remove(compressedPath)
+	log.Printf("Compression did not reduce file size. Using original file.")
+	return dstPath, size, false
+}
+
+// generateShareableLink generates an encrypted token and shareable link
+func generateShareableLink(host string) (string, string, error) {
 	token, err := generateToken()
 	if err != nil {
-		sendErrorResponse(w, "Failed to generate token", http.StatusInternalServerError)
-		return
+		return "", "", errors.New("failed to generate token")
 	}
 
-	// Encrypt the token for URL security
 	encryptedToken, err := encryptToken(token)
 	if err != nil {
 		log.Println("Error encrypting token:", err)
-		sendErrorResponse(w, "Failed to secure download link", http.StatusInternalServerError)
-		return
+		return "", "", errors.New("failed to secure download link")
 	}
 
-	// Calculate expiration time
+	shareableLink := fmt.Sprintf("http://%s/files/%s", host, encryptedToken)
+	return shareableLink, token, nil
+}
+
+// getOriginalFilename returns the original filename for the file
+func getOriginalFilename(headerFilename string, isEncrypted bool, originalNameParam string) string {
+	if isEncrypted && originalNameParam != "" {
+		return originalNameParam
+	}
+	return headerFilename
+}
+
+// fileStorageInfo holds all information needed to store a file
+type fileStorageInfo struct {
+	token        string
+	path         string
+	originalName string
+	params       uploadParams
+	size         int64
+	originalSize int64
+	isCompressed bool
+	url          string
+}
+
+// storeFileInfo stores the file information in the global map
+func storeFileInfo(info fileStorageInfo) {
 	now := time.Now()
-	expiresAt := now.Add(time.Duration(expirationMinutes) * time.Minute)
+	expiresAt := now.Add(time.Duration(info.params.expirationMinutes) * time.Minute)
 
-	// Create the shareable link with encrypted token
-	shareableLink := fmt.Sprintf("http://%s/files/%s", r.Host, encryptedToken)
-
-	// Check if this is an encrypted file
-	isEncrypted := false
-	originalFilename := header.Filename
-
-	// If the file was encrypted client-side, get the original name
-	if encryptedParam := r.FormValue("encrypted"); encryptedParam == "true" {
-		isEncrypted = true
-		if origName := r.FormValue("originalName"); origName != "" {
-			originalFilename = origName
-		}
-	}
-
-	// Store file information
-	fileInfo := &fileInfo{
-		Token:        token,
-		Path:         dstPath,
-		OriginalName: originalFilename,
+	fileData := &fileInfo{
+		Token:        info.token,
+		Path:         info.path,
+		OriginalName: info.originalName,
 		CreatedAt:    now,
 		ExpiresAt:    expiresAt,
-		Password:     passwordHash,
-		IsProtected:  isProtected,
-		Size:         size,
-		OriginalSize: originalSize,
-		IsCompressed: isCompressed,
-		IsEncrypted:  isEncrypted,
-		URL:          shareableLink,
+		Password:     info.params.passwordHash,
+		IsProtected:  info.params.isProtected,
+		Size:         info.size,
+		OriginalSize: info.originalSize,
+		IsCompressed: info.isCompressed,
+		IsEncrypted:  info.params.isEncrypted,
+		URL:          info.url,
 	}
 
 	mutex.Lock()
-	fileTokens[token] = fileInfo
+	fileTokens[info.token] = fileData
 	mutex.Unlock()
+}
 
-	// Prepare the response
+// sendUploadResponse sends the JSON response for successful upload
+func sendUploadResponse(w http.ResponseWriter, url string, params uploadParams, originalName string, size, originalSize int64, isCompressed bool) {
 	response := uploadResponse{
 		Success:      true,
-		URL:          shareableLink,
-		ExpiresIn:    expirationMinutes,
-		IsProtected:  isProtected,
-		OriginalName: originalFilename,
+		URL:          url,
+		ExpiresIn:    params.expirationMinutes,
+		IsProtected:  params.isProtected,
+		OriginalName: originalName,
 		Size:         size,
 		OriginalSize: originalSize,
 		IsCompressed: isCompressed,
-		IsEncrypted:  isEncrypted,
+		IsEncrypted:  params.isEncrypted,
 	}
 
-	// Set content type and send JSON response
-	w.Header().Set("Content-Type", "application/json")
+	w.Header().Set(contentTypeHeader, contentTypeJSON)
 	json.NewEncoder(w).Encode(response)
 }
 
 // sendErrorResponse sends a standardized JSON error response
 func sendErrorResponse(w http.ResponseWriter, message string, statusCode int) {
-	w.Header().Set("Content-Type", "application/json")
+	w.Header().Set(contentTypeHeader, contentTypeJSON)
 	w.WriteHeader(statusCode)
 
 	response := errorResponse{
@@ -400,7 +468,7 @@ func isAllowedExtension(ext string) bool {
 	ext = strings.ToLower(ext)
 
 	// Special case for encrypted files
-	if strings.HasSuffix(ext, ".encrypted") {
+	if strings.HasSuffix(ext, encryptedExt) {
 		return true
 	}
 
@@ -499,10 +567,8 @@ func shouldCompressFile(filename string) bool {
 }
 
 func downloadHandler(w http.ResponseWriter, r *http.Request) {
-	// Extract encrypted token from URL
 	encryptedToken := r.URL.Path[len("/files/"):]
 
-	// Decrypt the token
 	token, err := decryptToken(encryptedToken)
 	if err != nil {
 		log.Printf("Error decrypting token: %v", err)
@@ -510,61 +576,78 @@ func downloadHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	mutex.Lock()
-	info, ok := fileTokens[token] // Check if token exists
-	if !ok {
-		// If not, it's either invalid or was already cleaned up by the background job.
-		mutex.Unlock()
-		serveErrorPage(w, "Link is invalid or has expired.", http.StatusNotFound)
-		return
+	info, filePath, originalName, err := validateAndGetFileInfo(token, r, w)
+	if err != nil {
+		return // Error already handled
 	}
 
-	// Check if the file has expired
+	// Defer file removal to ensure it's cleaned up after the function returns
+	defer os.Remove(filePath)
+
+	// Serve the file
+	serveFile(w, r, filePath, originalName, encryptedToken)
+
+	log.Printf("Download of %s complete. The file has been deleted.", originalName)
+}
+
+// validateAndGetFileInfo validates the token and handles password protection
+func validateAndGetFileInfo(token string, r *http.Request, w http.ResponseWriter) (*fileInfo, string, string, error) {
+	mutex.Lock()
+	info, ok := fileTokens[token]
+	if !ok {
+		mutex.Unlock()
+		serveErrorPage(w, "Link is invalid or has expired.", http.StatusNotFound)
+		return nil, "", "", errors.New("token not found")
+	}
+
 	if time.Now().After(info.ExpiresAt) {
 		delete(fileTokens, token)
 		mutex.Unlock()
 		serveErrorPage(w, "This link has expired.", http.StatusGone)
-		return
+		return nil, "", "", errors.New("token expired")
 	}
 
-	// Check if password is required
 	if info.Password != "" {
-		// If this is not a POST request with password, show password form
 		if r.Method != http.MethodPost {
-			mutex.Unlock() // Unlock before rendering the form
-			servePasswordForm(w, r, token)
-			return
-		}
-
-		// If this is a POST, verify the password
-		if err := r.ParseForm(); err != nil {
 			mutex.Unlock()
-			serveErrorPage(w, "Error processing password.", http.StatusBadRequest)
-			return
+			servePasswordForm(w, r, token)
+			return nil, "", "", errors.New("password required")
 		}
 
-		password := r.FormValue("password")
-		hash := sha256.Sum256([]byte(password))
-		passwordHash := hex.EncodeToString(hash[:])
-
-		if passwordHash != info.Password {
+		if err := verifyPassword(r, info.Password); err != nil {
 			mutex.Unlock()
 			servePasswordForm(w, r, token, "Incorrect password. Please try again.")
-			return
+			return nil, "", "", err
 		}
 	}
 
-	// If we get here, the token is valid and password (if any) is correct
-	// For one-time use, delete the token now
 	delete(fileTokens, token)
 	filePath := info.Path
 	originalName := info.OriginalName
 	mutex.Unlock()
 
-	// Defer file removal to ensure it's cleaned up after the function returns
-	defer os.Remove(filePath)
+	return info, filePath, originalName, nil
+}
 
-	// Open the file to be served
+// verifyPassword verifies the password from the request
+func verifyPassword(r *http.Request, expectedHash string) error {
+	if err := r.ParseForm(); err != nil {
+		return errors.New("error processing password")
+	}
+
+	password := r.FormValue("password")
+	hash := sha256.Sum256([]byte(password))
+	passwordHash := hex.EncodeToString(hash[:])
+
+	if passwordHash != expectedHash {
+		return errors.New("incorrect password")
+	}
+
+	return nil
+}
+
+// serveFile serves the file to the client
+func serveFile(w http.ResponseWriter, r *http.Request, filePath, originalName, encryptedToken string) {
 	file, err := os.Open(filePath)
 	if err != nil {
 		log.Printf("ERROR: could not open file %s: %v", filePath, err)
@@ -573,7 +656,6 @@ func downloadHandler(w http.ResponseWriter, r *http.Request) {
 	}
 	defer file.Close()
 
-	// Get file stats for headers
 	fileStat, err := file.Stat()
 	if err != nil {
 		log.Printf("ERROR: could not stat file %s: %v", filePath, err)
@@ -581,36 +663,29 @@ func downloadHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Check if this is a raw request (for encrypted files)
-	if rawParam := r.URL.Query().Get("raw"); rawParam == "true" {
-		// For encrypted files, we want to serve the raw file without forcing download
-		w.Header().Set("Content-Disposition", fmt.Sprintf(`attachment; filename="%s"`, originalName))
-		w.Header().Set("Content-Type", "application/octet-stream")
-		w.Header().Set("Content-Length", fmt.Sprintf("%d", fileStat.Size()))
-	} else {
-		// For regular downloads, force download with the correct filename
-		w.Header().Set("Content-Disposition", fmt.Sprintf(`attachment; filename="%s"`, originalName))
-		w.Header().Set("Content-Type", "application/octet-stream")
-		w.Header().Set("Content-Length", fmt.Sprintf("%d", fileStat.Size()))
+	setDownloadHeaders(w, originalName, fileStat.Size())
 
-		// Check if this is an encrypted file and redirect to the decrypt page
-		if strings.HasSuffix(originalName, ".encrypted") {
-			http.Redirect(w, r, fmt.Sprintf("/decrypt/%s", encryptedToken), http.StatusSeeOther)
-			return
-		}
+	// Check if this is an encrypted file and redirect to the decrypt page
+	if rawParam := r.URL.Query().Get("raw"); rawParam != "true" && strings.HasSuffix(originalName, encryptedExt) {
+		http.Redirect(w, r, fmt.Sprintf("/decrypt/%s", encryptedToken), http.StatusSeeOther)
+		return
 	}
 
-	// Stream the file to the response writer
 	if _, err := io.Copy(w, file); err != nil {
 		log.Printf("ERROR: failed to write file to response: %v", err)
 	}
+}
 
-	log.Printf("Download of %s complete. The file has been deleted.", originalName)
+// setDownloadHeaders sets the appropriate headers for file download
+func setDownloadHeaders(w http.ResponseWriter, filename string, size int64) {
+	w.Header().Set("Content-Disposition", fmt.Sprintf(`attachment; filename="%s"`, filename))
+	w.Header().Set(contentTypeHeader, contentTypeOctet)
+	w.Header().Set("Content-Length", fmt.Sprintf("%d", size))
 }
 
 // servePasswordForm displays a form to enter password for protected files
 func servePasswordForm(w http.ResponseWriter, r *http.Request, token string, errorMsg ...string) {
-	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	w.Header().Set(contentTypeHeader, contentTypeHTML)
 
 	errorHTML := ""
 	if len(errorMsg) > 0 && errorMsg[0] != "" {
@@ -664,7 +739,7 @@ func servePasswordForm(w http.ResponseWriter, r *http.Request, token string, err
 
 // serveErrorPage displays a user-friendly error page
 func serveErrorPage(w http.ResponseWriter, message string, statusCode int) {
-	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	w.Header().Set(contentTypeHeader, contentTypeHTML)
 	w.WriteHeader(statusCode)
 
 	html := fmt.Sprintf(`<!DOCTYPE html>
@@ -728,14 +803,14 @@ func statsHandler(w http.ResponseWriter, r *http.Request) {
 		ServerTime:  time.Now().Format(time.RFC3339),
 	}
 
-	w.Header().Set("Content-Type", "application/json")
+	w.Header().Set(contentTypeHeader, contentTypeJSON)
 	json.NewEncoder(w).Encode(stats)
 }
 
 // filesListHandler returns a list of all active files (admin only)
 func filesListHandler(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
-		sendErrorResponse(w, "Method not allowed", http.StatusMethodNotAllowed)
+		sendErrorResponse(w, methodNotAllowed, http.StatusMethodNotAllowed)
 		return
 	}
 
@@ -751,7 +826,7 @@ func filesListHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Send the response
-	w.Header().Set("Content-Type", "application/json")
+	w.Header().Set(contentTypeHeader, contentTypeJSON)
 	json.NewEncoder(w).Encode(files)
 }
 
@@ -789,7 +864,7 @@ func fileActionHandler(w http.ResponseWriter, r *http.Request) {
 		}
 
 		// Send success response
-		w.Header().Set("Content-Type", "application/json")
+		w.Header().Set(contentTypeHeader, contentTypeJSON)
 		json.NewEncoder(w).Encode(map[string]interface{}{
 			"success": true,
 			"message": "File deleted successfully",
@@ -809,13 +884,13 @@ func fileActionHandler(w http.ResponseWriter, r *http.Request) {
 		}
 
 		// Send file info
-		w.Header().Set("Content-Type", "application/json")
+		w.Header().Set(contentTypeHeader, contentTypeJSON)
 		json.NewEncoder(w).Encode(info)
 		return
 	}
 
 	// If we get here, the method is not supported
-	sendErrorResponse(w, "Method not allowed", http.StatusMethodNotAllowed)
+	sendErrorResponse(w, methodNotAllowed, http.StatusMethodNotAllowed)
 }
 
 // loadConfig loads the configuration from config.json file
@@ -855,7 +930,7 @@ func loadConfig() {
 // setDefaultConfig sets default values for the configuration
 func setDefaultConfig() {
 	config.Server.Port = 8081
-	config.Server.Host = "0.0.0.0"
+	config.Server.Host = defaultHost
 	config.Files.MaxSizeMB = 100
 	config.Files.DefaultExpirationMinutes = 5
 	config.Files.AllowedExtensions = allowedExtensions

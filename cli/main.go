@@ -98,84 +98,106 @@ func main() {
 
 // uploadFile uploads a file to the server
 func uploadFile(filePath, serverURL string, expiration int, password string, compress bool) (*UploadResponse, error) {
-	// Open the file
 	file, err := os.Open(filePath)
 	if err != nil {
 		return nil, fmt.Errorf("failed to open file: %v", err)
 	}
 	defer file.Close()
 
-	// Create a buffer to store the multipart form data
+	// Create multipart form
+	requestBody, contentType, err := createMultipartForm(file, filePath, expiration, password, compress)
+	if err != nil {
+		return nil, err
+	}
+
+	// Send the request
+	uploadURL := fmt.Sprintf("%s/upload", serverURL)
+	resp, err := sendUploadRequest(uploadURL, requestBody, contentType)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	// Parse the response
+	return parseUploadResponse(resp)
+}
+
+// createMultipartForm creates the multipart form data for file upload
+func createMultipartForm(file *os.File, filePath string, expiration int, password string, compress bool) (*bytes.Buffer, string, error) {
 	var requestBody bytes.Buffer
 	writer := multipart.NewWriter(&requestBody)
 
 	// Create a form file field
 	part, err := writer.CreateFormFile("file", filepath.Base(filePath))
 	if err != nil {
-		return nil, fmt.Errorf("failed to create form file: %v", err)
+		return nil, "", fmt.Errorf("failed to create form file: %v", err)
 	}
 
 	// Copy the file content to the form field
-	_, err = io.Copy(part, file)
-	if err != nil {
-		return nil, fmt.Errorf("failed to copy file content: %v", err)
+	if _, err := io.Copy(part, file); err != nil {
+		return nil, "", fmt.Errorf("failed to copy file content: %v", err)
 	}
 
-	// Add expiration field
-	err = writer.WriteField("expiration", fmt.Sprintf("%d", expiration))
-	if err != nil {
-		return nil, fmt.Errorf("failed to add expiration field: %v", err)
-	}
-
-	// Add password field if provided
-	if password != "" {
-		err = writer.WriteField("password", password)
-		if err != nil {
-			return nil, fmt.Errorf("failed to add password field: %v", err)
-		}
-	}
-
-	// Add compression field
-	err = writer.WriteField("compress", fmt.Sprintf("%t", compress))
-	if err != nil {
-		return nil, fmt.Errorf("failed to add compress field: %v", err)
+	// Add form fields
+	if err := addFormFields(writer, expiration, password, compress); err != nil {
+		return nil, "", err
 	}
 
 	// Close the writer
-	err = writer.Close()
-	if err != nil {
-		return nil, fmt.Errorf("failed to close writer: %v", err)
+	if err := writer.Close(); err != nil {
+		return nil, "", fmt.Errorf("failed to close writer: %v", err)
 	}
 
-	// Create the HTTP request
-	uploadURL := fmt.Sprintf("%s/upload", serverURL)
-	req, err := http.NewRequest("POST", uploadURL, &requestBody)
+	return &requestBody, writer.FormDataContentType(), nil
+}
+
+// addFormFields adds the necessary form fields to the multipart writer
+func addFormFields(writer *multipart.Writer, expiration int, password string, compress bool) error {
+	if err := writer.WriteField("expiration", fmt.Sprintf("%d", expiration)); err != nil {
+		return fmt.Errorf("failed to add expiration field: %v", err)
+	}
+
+	if password != "" {
+		if err := writer.WriteField("password", password); err != nil {
+			return fmt.Errorf("failed to add password field: %v", err)
+		}
+	}
+
+	if err := writer.WriteField("compress", fmt.Sprintf("%t", compress)); err != nil {
+		return fmt.Errorf("failed to add compress field: %v", err)
+	}
+
+	return nil
+}
+
+// sendUploadRequest sends the HTTP request to upload the file
+func sendUploadRequest(uploadURL string, requestBody *bytes.Buffer, contentType string) (*http.Response, error) {
+	req, err := http.NewRequest("POST", uploadURL, requestBody)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create request: %v", err)
 	}
 
-	// Set the content type
-	req.Header.Set("Content-Type", writer.FormDataContentType())
+	req.Header.Set("Content-Type", contentType)
 
-	// Create a client with a timeout
 	client := &http.Client{
 		Timeout: 5 * time.Minute,
 	}
 
-	// Send the request
 	resp, err := client.Do(req)
 	if err != nil {
 		return nil, fmt.Errorf("failed to send request: %v", err)
 	}
-	defer resp.Body.Close()
 
-	// Read the response body
+	return resp, nil
+}
+
+// parseUploadResponse parses the server response
+func parseUploadResponse(resp *http.Response) (*UploadResponse, error) {
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
 		return nil, fmt.Errorf("failed to read response: %v", err)
 	}
 
-	// Check if the request was successful
 	if resp.StatusCode != http.StatusOK {
 		var errorResp ErrorResponse
 		if err := json.Unmarshal(body, &errorResp); err == nil {
@@ -184,7 +206,6 @@ func uploadFile(filePath, serverURL string, expiration int, password string, com
 		return nil, fmt.Errorf("server error: %s", resp.Status)
 	}
 
-	// Parse the response
 	var uploadResp UploadResponse
 	if err := json.Unmarshal(body, &uploadResp); err != nil {
 		return nil, fmt.Errorf("failed to parse response: %v", err)
