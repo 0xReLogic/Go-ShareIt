@@ -120,31 +120,6 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
   <i>Made with ❤️ by ReLogic</i>
 </div>
 
-## Roadmap
-
-Here is the future development plan for Go-ShareIt, based on priority:
-
-### v1.5 - Security Enhancements (Next Priority)
-- [x] **End-to-End Encryption**: Implement client-side encryption so the server can never read the file contents.
-- [x] **Password Protection**: Add an option to protect downloads with a password.
-- [x] **Custom Expiration Settings**: Allow users to set their own expiration time limits.
-- [x] **Token Encryption**: Encrypt the token within the URL to prevent manipulation.
-
-### v2.0 - Optimization & Advanced Features
-- [x] **Multi-File Upload**: Allow users to upload multiple files or an entire folder in a single session.
-- [x] **Automatic Compression**: Automatically compress files before upload to speed up transfers.
-- [x] **CLI Version**: Build a command-line interface (CLI) for power users, aligning with the project's original vision.
-
-### v3.0 - Enterprise & Integration Features
-- [ ] **User Accounts**: Add optional user accounts for tracking upload history.
-- [ ] **Team Sharing**: Allow teams to share files with access controls.
-- [ ] **API Keys**: Generate API keys for third-party integrations.
-- [ ] **Webhooks**: Send notifications to external services when files are uploaded or downloaded.
-- [ ] **Storage Backends**: Support for S3, Google Cloud Storage, and other storage providers.
-- [ ] **Analytics Dashboard**: Track usage statistics and file sharing patterns.
-
----
-
 ## API Documentation
 
 Go-ShareIt provides a RESTful API for integration with other applications:
@@ -234,14 +209,14 @@ Response:
 
 ## How to Contribute
 
-We welcome contributions from everyone to make Go-ShareIt better! If you're interested in helping, here are the areas where we need the most help:
+We welcome contributions from everyone to make Go-ShareIt better! If you're interested in helping, here are some areas where contributions would be valuable:
 
-1.  **Implement Roadmap Features**: You can pick up any item from the **v1.5 Roadmap** or **v2.0** above. Features like **end-to-end encryption** or **token encryption** would be incredibly valuable additions.
-
-2.  **Concurrency Improvements**: We currently use a standard `mutex` for access control. We'd like to implement more sophisticated solutions to handle many concurrent connections:
+1.  **Concurrency Improvements**: We currently use a standard `mutex` for access control. We'd like to implement more sophisticated solutions to handle many concurrent connections:
     -   **For Uploads**: Use a *Worker Pool Pattern* to limit the number of simultaneous uploads.
     -   **For Downloads**: Use a *Channel as a Semaphore* to ensure only one download is active per token.
 
-3.  **Refactoring & Testing**: Help write unit and integration tests to ensure code stability and reliability as new features are added.
+2.  **Testing**: Help write unit and integration tests to ensure code stability and reliability.
+
+3.  **Documentation**: Improve documentation, add examples, or create tutorials.
 
 Please open a new issue to discuss your ideas or claim an existing one before you start working. Thank you for helping!
