@@ -117,22 +117,22 @@ func main() {
 			http.NotFound(w, r)
 			return
 		}
-		http.ServeFile(w, r, "index.html")
+		http.ServeFile(w, r, "web/index.html")
 	})
 
 	// Multi-file upload page
 	http.HandleFunc("/multi", func(w http.ResponseWriter, r *http.Request) {
-		http.ServeFile(w, r, "multi-upload.html")
+		http.ServeFile(w, r, "web/multi-upload.html")
 	})
 
 	// End-to-end encrypted upload page
 	http.HandleFunc("/e2e", func(w http.ResponseWriter, r *http.Request) {
-		http.ServeFile(w, r, "e2e-upload.html")
+		http.ServeFile(w, r, "web/e2e-upload.html")
 	})
 
 	// Decryption page for encrypted files
 	http.HandleFunc("/decrypt/", func(w http.ResponseWriter, r *http.Request) {
-		http.ServeFile(w, r, "decrypt.html")
+		http.ServeFile(w, r, "web/decrypt.html")
 	})
 
 	// File handling endpoints
@@ -146,7 +146,7 @@ func main() {
 
 	// Admin dashboard
 	http.HandleFunc("/admin", basicAuth(func(w http.ResponseWriter, r *http.Request) {
-		http.ServeFile(w, r, "admin.html")
+		http.ServeFile(w, r, "web/admin.html")
 	}, AdminUsername, AdminPassword))
 
 	// Create uploads directory if it doesn't exist
