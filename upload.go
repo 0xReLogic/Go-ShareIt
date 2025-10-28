@@ -41,8 +41,8 @@ func uploadHandler(w http.ResponseWriter, r *http.Request) {
 	// Handle compression if needed
 	finalPath, finalSize, isCompressed := handleFileCompression(dstPath, header.Filename, size, params.doCompress)
 
-	log.Printf("File uploaded successfully (saved as %s), Size: %d bytes, Compressed: %v\n",
-		filepath.Base(finalPath), finalSize, isCompressed)
+	log.Printf("File uploaded successfully, Size: %d bytes, Compressed: %v\n",
+		finalSize, isCompressed)
 
 	// Generate shareable link
 	shareableLink, token, err := generateShareableLink(r.Host)
@@ -84,14 +84,14 @@ func parseUploadRequest(r *http.Request) (multipart.File, *multipart.FileHeader,
 	}
 
 	if header.Size > MaxFileSize {
-		log.Printf("File too large: %d bytes", header.Size)
+		log.Printf("File too large: exceeds maximum size")
 		return nil, nil, fmt.Errorf("file too large. Maximum size is %d MB", MaxFileSize/(1024*1024))
 	}
 
 	if len(allowedExtensions) > 0 {
 		fileExt := strings.ToLower(filepath.Ext(header.Filename))
 		if !isAllowedExtension(fileExt) {
-			log.Printf("Invalid file type: %s", fileExt)
+			log.Println("Invalid file type uploaded")
 			return nil, nil, errors.New("file type not allowed")
 		}
 	}
@@ -195,8 +195,8 @@ func handleFileCompression(dstPath, filename string, size int64, doCompress bool
 
 	if compressedInfo.Size() < size {
 		os.Remove(dstPath)
-		log.Printf("File compressed successfully. Original: %d bytes, Compressed: %d bytes (%.1f%%)",
-			size, compressedInfo.Size(), float64(compressedInfo.Size())/float64(size)*100)
+		log.Printf("File compressed successfully. Compressed: %d bytes (%.1f%%)",
+			compressedInfo.Size(), float64(compressedInfo.Size())/float64(size)*100)
 		return compressedPath, compressedInfo.Size(), true
 	}
 

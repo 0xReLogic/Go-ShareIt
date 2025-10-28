@@ -78,7 +78,7 @@ func main() {
 	fmt.Printf("Expires in: %d minutes\n", response.ExpiresIn)
 
 	if response.IsProtected {
-		fmt.Printf("Password protected: Yes (password: %s)\n", *password)
+		fmt.Println("Password protected: Yes")
 	} else {
 		fmt.Println("Password protected: No")
 	}

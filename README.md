@@ -3,13 +3,14 @@
   <h1>Go-ShareIt</h1>
   <p>A simple, secure, and self-hosted file sharing application.</p>
 
-  <a href="https://github.com/0xReLogic/Go-ShareIt/releases"><img src="https://img.shields.io/github/release/0xReLogic/Go-ShareIt.svg?style=for-the-badge&logo=github" alt="Release"></a>
-  <a href="https://goreportcard.com/report/github.com/0xReLogic/Go-ShareIt"><img src="https://goreportcard.com/badge/github.com/0xReLogic/Go-ShareIt?style=for-the-badge" alt="Go Report Card"></a>
-  <a href="https://github.com/0xReLogic/Go-ShareIt/blob/main/LICENSE"><img src="https://img.shields.io/github/license/0xReLogic/Go-ShareIt?style=for-the-badge" alt="License"></a>
-  <br/>
-  <img src="https://img.shields.io/badge/Go-1.22+-00ADD8?style=for-the-badge&logo=go" alt="Go Version">
-  <img src="https://img.shields.io/badge/Platform-Windows%20%7C%20macOS%20%7C%20Linux-blue?style=for-the-badge&logo=windows" alt="Platform">
-  <img src="https://raw.githubusercontent.com/MartinHeinz/MartinHeinz/master/images/gopher.gif" height="32" alt="Running Gopher">
+<a href="https://github.com/0xReLogic/Go-ShareIt/releases"><img src="https://img.shields.io/github/release/0xReLogic/Go-ShareIt.svg?style=for-the-badge&logo=github" alt="Release"></a>
+<a href="https://goreportcard.com/report/github.com/0xReLogic/Go-ShareIt"><img src="https://goreportcard.com/badge/github.com/0xReLogic/Go-ShareIt?style=for-the-badge" alt="Go Report Card"></a>
+<a href="https://github.com/0xReLogic/Go-ShareIt/blob/main/LICENSE"><img src="https://img.shields.io/github/license/0xReLogic/Go-ShareIt?style=for-the-badge" alt="License"></a>
+<br/>
+<img src="https://img.shields.io/badge/Go-1.22+-00ADD8?style=for-the-badge&logo=go" alt="Go Version">
+<img src="https://img.shields.io/badge/Platform-Windows%20%7C%20macOS%20%7C%20Linux-blue?style=for-the-badge&logo=windows" alt="Platform">
+<img src="https://raw.githubusercontent.com/MartinHeinz/MartinHeinz/master/images/gopher.gif" height="32" alt="Running Gopher">
+
 </div>
 
 ---
@@ -18,13 +19,13 @@ Go-ShareIt is a lightweight, local-first file sharing application built entirely
 
 ## Screenshots
 
-| 1. Main Upload Page | 2. Upload Successful | 3. Link Expired |
-| :---: | :---: | :---: |
+|                               1. Main Upload Page                               |                               2. Upload Successful                               |                               3. Link Expired                               |
+| :-----------------------------------------------------------------------------: | :------------------------------------------------------------------------------: | :-------------------------------------------------------------------------: |
 | <img src="https://i.imgur.com/q3t3Nob.png" alt="Main Upload Page" width="100%"> | <img src="https://i.imgur.com/ZPQi7XX.png" alt="Upload Successful" width="100%"> | <img src="https://i.imgur.com/rko7BYF.png" alt="Link Expired" width="100%"> |
 
 ## Features
 
-- **Secure One-Time Downloads**: Each generated link is valid for only a single download. 
+- **Secure One-Time Downloads**: Each generated link is valid for only a single download.
 - **Self-Destructing Files**: After a successful download, the file is immediately and permanently deleted from the server's storage.
 - **End-to-End Encryption**: Client-side encryption ensures the server never sees the unencrypted content of your files.
 - **Large File Support**: Efficiently handles large files of any size through streaming, ensuring low memory usage.
@@ -46,37 +47,41 @@ Go-ShareIt is a lightweight, local-first file sharing application built entirely
 ## Usage
 
 1.  **Download** the latest release for your operating system from the [Releases](https://github.com/0xReLogic/Go-ShareIt/releases) page.
-2.  **Run** the executable file. A terminal window will open, indicating that the server is running.
-3.  **Allow Firewall Access**: If your operating system's firewall prompts for permission, make sure to **Allow Access**, especially for **Private Networks**. This is crucial for other devices to connect.
-4.  **Start Sharing**:
-    -   **On the same computer**: Open your web browser and navigate to `http://localhost:8080`.
-    -   **From another device (phone/laptop)**:
-        1.  Connect the device to the **same Wi-Fi network or mobile hotspot**.
-        2.  Find the local IP address of the computer running Go-ShareIt:
-            -   **Windows**: Open Command Prompt (`cmd`) and type `ipconfig`. Look for the `IPv4 Address`.
-            -   **macOS/Linux**: Open a terminal and type `ip addr` or `ifconfig`.
-        3.  On your other device's browser, enter `http://<YOUR_LOCAL_IP>:8080` (e.g., `http://192.168.1.10:8080`).
-5.  **Upload Files**:
-    -   **Single File Upload**: On the main page
-        -   Select a file to upload
-        -   Choose an expiration time (5 minutes, 15 minutes, 1 hour, or 24 hours)
-        -   Optionally add password protection
-        -   Click "Upload File" and wait for the upload to complete
-    -   **Multi-File Upload**: Go to `http://localhost:8080/multi`
-        -   Select multiple files to upload
-        -   Configure expiration time and password (applies to all files)
-        -   Click "Upload Files" and wait for all uploads to complete
-    -   **End-to-End Encrypted Upload**: Go to `http://localhost:8080/e2e`
-        -   Select a file to encrypt and upload
-        -   The file is encrypted in your browser before being uploaded
-        -   The encryption key never leaves your device
-        -   Share both the link and the decryption key with the recipient
-6.  **Share the Links**: Copy the generated links and share them with recipients.
-7.  **Admin Dashboard**: Access the admin dashboard at `http://localhost:8080/admin` (username: admin, password: admin123) to monitor and manage all active file shares.
+2.  **Set Environment Variable** (Required): Set `SHAREIT_ENCRYPTION_KEY` with a 32-character string before running:
+    - **Windows (PowerShell):** `$env:SHAREIT_ENCRYPTION_KEY="your-32-character-key-here"`
+    - **Linux/Mac:** `export SHAREIT_ENCRYPTION_KEY="your-32-character-key-here"`
+    - See `.env.example` for key generation commands
+3.  **Run** the executable file. A terminal window will open, indicating that the server is running.
+4.  **Allow Firewall Access**: If your operating system's firewall prompts for permission, make sure to **Allow Access**, especially for **Private Networks**. This is crucial for other devices to connect.
+5.  **Start Sharing**:
+    - **On the same computer**: Open your web browser and navigate to `http://localhost:8080`.
+    - **From another device (phone/laptop)**:
+      1.  Connect the device to the **same Wi-Fi network or mobile hotspot**.
+      2.  Find the local IP address of the computer running Go-ShareIt:
+          - **Windows**: Open Command Prompt (`cmd`) and type `ipconfig`. Look for the `IPv4 Address`.
+          - **macOS/Linux**: Open a terminal and type `ip addr` or `ifconfig`.
+      3.  On your other device's browser, enter `http://<YOUR_LOCAL_IP>:8080` (e.g., `http://192.168.1.10:8080`).
+6.  **Upload Files**:
+    - **Single File Upload**: On the main page
+      - Select a file to upload
+      - Choose an expiration time (5 minutes, 15 minutes, 1 hour, or 24 hours)
+      - Optionally add password protection
+      - Click "Upload File" and wait for the upload to complete
+    - **Multi-File Upload**: Go to `http://localhost:8080/multi`
+      - Select multiple files to upload
+      - Configure expiration time and password (applies to all files)
+      - Click "Upload Files" and wait for all uploads to complete
+    - **End-to-End Encrypted Upload**: Go to `http://localhost:8080/e2e`
+      - Select a file to encrypt and upload
+      - The file is encrypted in your browser before being uploaded
+      - The encryption key never leaves your device
+      - Share both the link and the decryption key with the recipient
+7.  **Share the Links**: Copy the generated links and share them with recipients.
+8.  **Admin Dashboard**: Access the admin dashboard at `http://localhost:8080/admin` (username: admin, password: admin123) to monitor and manage all active file shares.
 
 ## How to Build (For Developers)
 
-To build the project from the source code, you will need to have Go installed. 
+To build the project from the source code, you will need to have Go installed.
 
 1.  Clone the repository:
     ```sh
@@ -131,6 +136,7 @@ POST /upload
 ```
 
 Form data:
+
 - `file`: File to upload (required)
 - `expiration`: Expiration time in minutes (optional, default: 5)
 - `password`: Password protection (optional)
@@ -139,6 +145,7 @@ Form data:
 - `originalName`: Original filename for encrypted files (optional, used with `encrypted=true`)
 
 Response:
+
 ```json
 {
   "success": true,
@@ -160,6 +167,7 @@ GET /api/stats
 ```
 
 Response:
+
 ```json
 {
   "activeFiles": 5,
@@ -177,6 +185,7 @@ GET /api/files
 Requires Basic Authentication.
 
 Response:
+
 ```json
 [
   {
@@ -200,6 +209,7 @@ DELETE /api/files/{token}
 Requires Basic Authentication.
 
 Response:
+
 ```json
 {
   "success": true,
@@ -212,8 +222,9 @@ Response:
 We welcome contributions from everyone to make Go-ShareIt better! If you're interested in helping, here are some areas where contributions would be valuable:
 
 1.  **Concurrency Improvements**: We currently use a standard `mutex` for access control. We'd like to implement more sophisticated solutions to handle many concurrent connections:
-    -   **For Uploads**: Use a *Worker Pool Pattern* to limit the number of simultaneous uploads.
-    -   **For Downloads**: Use a *Channel as a Semaphore* to ensure only one download is active per token.
+
+    - **For Uploads**: Use a _Worker Pool Pattern_ to limit the number of simultaneous uploads.
+    - **For Downloads**: Use a _Channel as a Semaphore_ to ensure only one download is active per token.
 
 2.  **Testing**: Help write unit and integration tests to ensure code stability and reliability.
 

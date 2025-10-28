@@ -12,7 +12,7 @@ import (
 )
 
 // Encryption key for token security (32 bytes for AES-256)
-var encryptionKey = []byte("12345678901234567890123456789012") // Exactly 32 bytes
+var encryptionKey []byte
 
 // generateToken creates a secure random token
 func generateToken() (string, error) {

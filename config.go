@@ -68,7 +68,25 @@ func loadConfig() {
 		allowedExtensions = config.Files.AllowedExtensions
 	}
 
+	// Load encryption key from environment variable or config
+	loadEncryptionKey()
+
 	log.Println("Configuration loaded successfully")
+}
+
+// loadEncryptionKey loads the encryption key from environment variable
+func loadEncryptionKey() {
+	envKey := os.Getenv("SHAREIT_ENCRYPTION_KEY")
+	if envKey == "" {
+		log.Fatal("SHAREIT_ENCRYPTION_KEY environment variable not set. See .env.example for setup instructions.")
+	}
+
+	encryptionKey = []byte(envKey)
+	if len(encryptionKey) != 32 {
+		log.Fatal("SHAREIT_ENCRYPTION_KEY must be exactly 32 characters")
+	}
+
+	log.Println("Encryption key loaded successfully")
 }
 
 // setDefaultConfig sets default values for the configuration
