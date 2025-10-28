@@ -73,13 +73,13 @@ func parseUploadRequest(r *http.Request) (multipart.File, *multipart.FileHeader,
 	r.Body = http.MaxBytesReader(nil, r.Body, MaxFileSize+1024)
 
 	if err := r.ParseMultipartForm(32 << 20); err != nil {
-		log.Println("Error parsing multipart form:", err)
+		log.Println("Error parsing multipart form")
 		return nil, nil, errors.New("error processing file upload. The file may be too large")
 	}
 
 	file, header, err := r.FormFile("file")
 	if err != nil {
-		log.Println("Error getting file from form:", err)
+		log.Println("Error getting file from form")
 		return nil, nil, errors.New("no file uploaded or error reading file")
 	}
 
